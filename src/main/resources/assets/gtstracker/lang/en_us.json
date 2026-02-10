@@ -1,0 +1,7 @@
+{
+  "key.gtstracker.open_terminal": "Open GTS Terminal",
+  "command.gtstracker.status": "GTS Tracker initialized. DB ready.",
+  "command.gtstracker.next": "Next implementation milestones",
+  "command.gtstracker.ingesttest": "Parse and ingest a sample GTS message",
+  "screen.gtstracker.title": "Cobblemon Markets"
+}
