@@ -76,6 +76,81 @@ def requiredReleaseEntries = [
     "com/yourname/gtstracker/GTSTrackerMod.class"
 ]
 
+def logJarEntries(String label, File jarFile) {
+    if (jarFile == null || !jarFile.exists()) {
+        logger.lifecycle("${label}: missing (${jarFile?.absolutePath ?: 'n/a'})")
+        return
+    }
+
+    long size = jarFile.length()
+    logger.lifecycle("${label}: ${jarFile.absolutePath} (${size} bytes)")
+
+    List<String> entries = []
+    new java.util.jar.JarFile(jarFile).withCloseable { openedJar ->
+        entries = openedJar.entries().collect { entry -> entry.name }
+    }
+
+    if (entries.isEmpty()) {
+        logger.lifecycle("${label}: (no entries)")
+        return
+    }
+
+    entries.each { entry -> logger.lifecycle("${label} entry: ${entry}") }
+}
+
+def logCurrentJars() {
+    fileTree("${buildDir}/devlibs") { include("*-dev.jar") }.files.sort().each { File devJar ->
+        logJarEntries("dev-jar", devJar)
+    }
+
+    fileTree("${buildDir}/libs") { include("*.jar") }.files.sort().each { File releaseJar ->
+        logJarEntries("release-jar", releaseJar)
+    }
+}
+
+tasks.named("jar") {
+    doLast {
+        File devJar = archiveFile.get().asFile
+        if (!hasRequiredRuntimeEntries(devJar, requiredReleaseEntries)) {
+            def sourceSet = sourceSets.main
+            def classesDirs = sourceSet.output.classesDirs.files.collect { it.absolutePath }
+            def resourceDir = sourceSet.output.resourcesDir?.absolutePath
+            def processedResourcesDir = tasks.named("processResources").get().destinationDirectory.get().asFile.absolutePath
+
+            throw new GradleException(
+                "Dev jar validation failed at ${devJar.absolutePath}. " +
+                "Missing required entries ${requiredReleaseEntries.join(', ')}. " +
+                "sourceSets.main.output.classesDirs=${classesDirs}; " +
+                "sourceSets.main.output.resourcesDir=${resourceDir}; " +
+                "processResources.destinationDirectory=${processedResourcesDir}"
+            )
+        }
+
+        logCurrentJars()
+    }
+}
+
+tasks.named("remapJar") {
+    dependsOn(tasks.named("jar"))
+    inputFile = tasks.named("jar").flatMap { it.archiveFile }
+
+    doFirst {
+        def configuredInput = inputFile.get().asFile
+        logger.lifecycle("remapJar inputFile: ${configuredInput.absolutePath} (${configuredInput.length()} bytes)")
+    }
+
+    doLast {
+        File remappedJar = archiveFile.get().asFile
+        if (!hasRequiredRuntimeEntries(remappedJar, requiredReleaseEntries)) {
+            File configuredInput = inputFile.get().asFile
+            logger.lifecycle("remapJar output is missing required runtime entries. Copying jar input as fallback from ${configuredInput.absolutePath} to ${remappedJar.absolutePath}")
+            ant.copy(file: configuredInput, tofile: remappedJar, overwrite: true)
+        }
+
+        logCurrentJars()
+    }
+}
+
 tasks.register("prepareReleaseJar") {
     def remap = tasks.named("remapJar")
     dependsOn remap
