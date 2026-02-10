@@ -153,5 +153,5 @@ tasks.register("verifyReleaseJar") {
 }
 
 tasks.named("build") {
-    finalizedBy tasks.named("verifyReleaseJar")
+    dependsOn tasks.named("verifyReleaseJar")
 }
