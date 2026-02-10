@@ -41,8 +41,13 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
-tasks.named("jar") {
-    from sourceSets.main.output
+def jarTask = tasks.named("jar")
+
+tasks.named("remapJar") {
+    dependsOn jarTask
+    inputFile.set(jarTask.flatMap { it.archiveFile })
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    archiveClassifier.set("")
 }
 
 java {
