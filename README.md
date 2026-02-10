@@ -132,6 +132,19 @@ Optional debug artifact:
 3. Run `/gtstracker gui` to verify GUI opening/rendering on your target modpack profile.
 4. Re-run `./gradlew clean build` and verify final artifact contents with: `jar tf build/libs/<jar-name>.jar`.
 
+
+## Download-ready jar from GitHub (no binary committed)
+
+This repository does not commit `.jar` binaries directly (to avoid Git/GitHub binary diff limitations).
+Use one of these download paths instead:
+
+1. **Actions artifact** (every push/manual workflow run):
+   - Open the **Build Jar** workflow run.
+   - Download the `gtstracker-jar` artifact.
+2. **Release asset** (recommended for end users):
+   - Create/push a tag like `v0.1.0`.
+   - Download `gtstracker-0.1.0.jar` from the GitHub Release assets.
+
 ## Runtime output locations
 
 When running from Gradle, runtime artifacts are typically written under `run/`:
