@@ -60,7 +60,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
-def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+def jarTaskProvider = tasks.named("jar")
+def devJarPath = jarTaskProvider.flatMap { it.archiveFile }
+def remapJarTaskProvider = tasks.named("remapJar")
+def releaseJarPath = remapJarTaskProvider.flatMap { it.archiveFile }
 def expectedClassPrefix = "com/yourname/gtstracker/"
 def minimumReleaseJarBytes = 10 * 1024L
 
@@ -77,8 +80,30 @@ def requiredReleaseEntries = [
     "com/yourname/gtstracker/GTSTrackerMod.class"
 ]
 
+tasks.register("verifyDevJar") {
+    dependsOn jarTaskProvider
+
+    doLast {
+        File devJar = devJarPath.get().asFile
+        if (!devJar.exists()) {
+            throw new GradleException("Dev jar validation failed: jar does not exist at ${devJar.absolutePath}")
+        }
+
+        if (!hasRequiredRuntimeEntries(devJar, requiredReleaseEntries)) {
+            throw new GradleException("Dev jar validation failed: jar is missing required runtime entries (${requiredReleaseEntries.join(', ')}) at ${devJar.absolutePath}")
+        }
+    }
+}
+
+
+tasks.named("remapJar") {
+    dependsOn tasks.named("verifyDevJar")
+    inputFile = devJarPath.get().asFile
+}
+
 tasks.register("prepareReleaseJar") {
-    dependsOn tasks.named("remapJar")
+    dependsOn remapJarTaskProvider
+    dependsOn tasks.named("verifyDevJar")
 
     doLast {
         File remappedJar = releaseJarPath.get().asFile
