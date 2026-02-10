@@ -32,12 +32,28 @@ jobs:
       - name: Resolve remapped release jar
         id: release_jar
         run: |
-          JAR_PATH=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-dev.jar' ! -name '*-sources.jar' | head -n 1)
-          if [ -z "$JAR_PATH" ]; then
+          CANDIDATE_LIST=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-dev.jar' ! -name '*-sources.jar' -printf '%s %p\n' | sort -nr)
+          if [ -z "$CANDIDATE_LIST" ]; then
             echo "No remapped release jar found in build/libs"
             exit 1
           fi
-          echo "Using release jar: $JAR_PATH"
+
+          JAR_PATH=$(printf '%s\n' "$CANDIDATE_LIST" | head -n 1 | cut -d' ' -f2-)
+          JAR_SIZE=$(stat -c%s "$JAR_PATH")
+
+          if [ "$JAR_SIZE" -lt 10240 ]; then
+            echo "Selected jar is unexpectedly small (${JAR_SIZE} bytes): $JAR_PATH"
+            echo "Available candidates:"
+            printf '%s\n' "$CANDIDATE_LIST"
+            exit 1
+          fi
+
+          if ! jar tf "$JAR_PATH" | grep -q '^fabric.mod.json$'; then
+            echo "Selected jar does not contain fabric.mod.json: $JAR_PATH"
+            exit 1
+          fi
+
+          echo "Using release jar: $JAR_PATH (${JAR_SIZE} bytes)"
           echo "path=$JAR_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload jar artifact
