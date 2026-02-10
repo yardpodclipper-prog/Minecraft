@@ -15,6 +15,23 @@ Client-side Fabric mod that parses GTS listings from chat and stores snapshots l
 
 > If your loader/build files target different versions, update this README to match.
 
+
+## Canonical runtime architecture
+
+`GTSTrackerMod` is the only supported runtime entrypoint and initializes the production ingestion pipeline in this order:
+
+1. `config.ConfigManager` loads `ConfigModel`.
+2. `database.DatabaseManager` initializes SQLite schema and connection.
+3. `ingest.ListingIngestionService` ingests parsed listings into the DB.
+4. `chat.GTSChatMonitor` listens to incoming chat and forwards GTS lines into ingestion.
+5. `ui.CommandHandler` registers commands that interact with the same runtime services.
+
+The canonical parsing + persistence path is:
+
+`chat.GTSMessageParser` -> `ingest.ListingIngestionService` -> `database.DatabaseManager`
+
+Legacy duplicate classes that previously existed in `com.yourname.gtstracker` were removed to avoid ambiguity. Keep new parsing, ingestion, and persistence changes on the package-scoped runtime path above.
+
 ## Commands
 
 The mod registers both namespaced and legacy command roots:
