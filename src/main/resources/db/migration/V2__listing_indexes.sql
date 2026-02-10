@@ -1,15 +1,9 @@
--- Added to support DAO access patterns and prevent table scans in price-sample queries.
-CREATE INDEX IF NOT EXISTS idx_listings_status_created_at
-    ON listings(status, created_at DESC);
+-- Introduce composite indexes used by price sampling and active listing queries.
+CREATE INDEX IF NOT EXISTS idx_listings_status_last_seen
+    ON listings(status, last_seen DESC);
 
-CREATE INDEX IF NOT EXISTS idx_listings_updated_at
-    ON listings(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listings_type_status_last_seen
+    ON listings(listing_type, status, last_seen DESC);
 
-CREATE INDEX IF NOT EXISTS idx_listings_pokemon_samples
-    ON listings(listing_type, pokemon_species, is_shiny, iv_total, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_listings_item_samples
-    ON listings(listing_type, item_name, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_listings_lifecycle
-    ON listings(status, last_seen_at, expires_at);
+CREATE INDEX IF NOT EXISTS idx_pokemon_species_shiny_iv
+    ON pokemon_listings(species, is_shiny, iv_total);

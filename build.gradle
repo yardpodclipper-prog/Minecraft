@@ -59,6 +59,7 @@ tasks.test {
 
 
 
+
 tasks.register("liveJar", Copy) {
     dependsOn tasks.named("jar")
     mustRunAfter tasks.named("remapJar")
@@ -67,8 +68,6 @@ tasks.register("liveJar", Copy) {
     rename { "${base.archivesName.get()}-${project.version}.jar" }
 }
 
-
-tasks.register("prepareReleaseJar", Copy) {
 tasks.register("testJar", Copy) {
     dependsOn tasks.named("jar")
     from(tasks.named("jar", Jar).flatMap { it.archiveFile })
@@ -76,30 +75,6 @@ tasks.register("testJar", Copy) {
     rename { "${base.archivesName.get()}-${project.version}.jar" }
 }
 
-tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("prepareReleaseJar")
-
-    doLast {
-        def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar").get().asFile
-        def zip = new java.util.zip.ZipFile(releaseJar)
-        try {
-            def requiredEntries = [
-                "fabric.mod.json",
-                "com/yourname/gtstracker/GTSTrackerMod.class"
-            ]
-
-            def missing = requiredEntries.findAll { zip.getEntry(it) == null }
-            if (!missing.isEmpty()) {
-                throw new GradleException("Release jar is missing required entries: ${missing.join(', ')}")
-            }
-        } finally {
-            zip.close()
-        }
-    }
-}
-
-tasks.named("check") {
-    dependsOn tasks.named("verifyReleaseJar")
 def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
 
 tasks.register("verifyReleaseJar") {
@@ -128,6 +103,10 @@ tasks.register("verifyReleaseJar") {
             )
         }
     }
+}
+
+tasks.named("check") {
+    dependsOn tasks.named("verifyReleaseJar")
 }
 
 tasks.named("build") {
