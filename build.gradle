@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.8-SNAPSHOT'
+    id 'fabric-loom' version '1.8.13'
     id 'maven-publish'
 }
 
@@ -48,4 +48,17 @@ java {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+
+
+tasks.register("testJar", Copy) {
+    dependsOn tasks.named("jar")
+    from(tasks.named("jar", Jar).flatMap { it.archiveFile })
+    into(layout.buildDirectory.dir("libs"))
+    rename { "${base.archivesName.get()}-${project.version}-test.jar" }
+}
+
+tasks.named("build") {
+    dependsOn tasks.named("testJar")
 }
