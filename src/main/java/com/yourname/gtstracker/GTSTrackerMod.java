@@ -3,6 +3,7 @@ package com.yourname.gtstracker;
 import com.yourname.gtstracker.config.ConfigManager;
 import com.yourname.gtstracker.config.ConfigModel;
 import com.yourname.gtstracker.chat.GTSChatMonitor;
+import com.yourname.gtstracker.compat.CompatibilityReporter;
 import com.yourname.gtstracker.database.DatabaseManager;
 import com.yourname.gtstracker.ingest.ListingIngestionService;
 import com.yourname.gtstracker.ui.CommandHandler;
@@ -43,6 +44,8 @@ public final class GTSTrackerMod implements ClientModInitializer {
 
         try {
             instance = this;
+        instance = this;
+        try {
             this.config = ConfigManager.load();
 
             this.databaseManager = new DatabaseManager();
@@ -57,6 +60,12 @@ public final class GTSTrackerMod implements ClientModInitializer {
         } catch (Exception exception) {
             LOGGER.error("Failed to initialize Cobblemon GTS Tracker. The mod may not function correctly.", exception);
             throw exception;
+            CompatibilityReporter.logStartupCompatibility();
+            CommandHandler.register();
+            LOGGER.info("Cobblemon GTS Tracker initialized.");
+        } catch (RuntimeException e) {
+            LOGGER.error("GTSTracker failed to initialize. See stack trace for details.", e);
+            throw e;
         }
     }
 }

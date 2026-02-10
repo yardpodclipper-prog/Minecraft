@@ -45,12 +45,12 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-
 tasks.test {
     useJUnitPlatform()
 }
 
 tasks.register("prepareReleaseJar", Copy) {
+tasks.register("testJar", Copy) {
     dependsOn tasks.named("jar")
     from(tasks.named("jar", Jar).flatMap { it.archiveFile })
     into(layout.buildDirectory.dir("libs"))
@@ -81,4 +81,37 @@ tasks.register("verifyReleaseJar") {
 
 tasks.named("check") {
     dependsOn tasks.named("verifyReleaseJar")
+def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+
+tasks.register("verifyReleaseJar") {
+    dependsOn tasks.named("remapJar")
+
+    doLast {
+        File remapped = releaseJar.get().asFile
+        if (!remapped.exists()) {
+            throw new GradleException("Release jar was not produced by remapJar: ${remapped}")
+        }
+
+        int fileEntries = 0
+        boolean hasModMetadata = false
+        boolean hasEntrypointClass = false
+
+        new java.util.zip.ZipFile(remapped).withCloseable { zip ->
+            def entries = zip.entries().toList()
+            fileEntries = entries.findAll { !it.isDirectory() }.size()
+            hasModMetadata = entries.any { it.name == 'fabric.mod.json' }
+            hasEntrypointClass = entries.any { it.name == 'com/yourname/gtstracker/GTSTrackerMod.class' }
+        }
+
+        if (fileEntries <= 1 || !hasModMetadata || !hasEntrypointClass) {
+            throw new GradleException(
+                "Invalid remapJar release artifact at ${remapped} (files=${fileEntries}, fabric.mod.json=${hasModMetadata}, entrypoint=${hasEntrypointClass})."
+            )
+        }
+    }
+}
+
+tasks.named("build") {
+    dependsOn tasks.named("testJar")
+    finalizedBy tasks.named("verifyReleaseJar")
 }

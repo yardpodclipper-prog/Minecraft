@@ -80,6 +80,20 @@ jar tf build/libs/gtstracker-0.1.0.jar | head
 ```
 
 The build now includes `verifyReleaseJar`, which validates that the release jar contains required runtime entries (`fabric.mod.json` and `GTSTrackerMod.class`) before `check` passes.
+Use this artifact for immediate testing/deployment:
+
+- `build/libs/gtstracker-0.1.0.jar` (produced by Loom `remapJar`; build now fails if this artifact is missing/invalid).
+
+Optional debug artifact:
+
+- `build/libs/gtstracker-0.1.0-test.jar`
+
+### What is still needed for final live verification
+
+1. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions above.
+2. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
+3. Run `/gtstracker gui` to verify GUI opening/rendering on your target modpack profile.
+4. Re-run `./gradlew clean build` and verify final artifact contents with: `jar tf build/libs/<jar-name>.jar`.
 
 ## Runtime output locations
 
