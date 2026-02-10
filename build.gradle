@@ -60,6 +60,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
+def jarTaskProvider = tasks.named("jar")
+def devJarPath = jarTaskProvider.flatMap { it.archiveFile }
+def remapJarTaskProvider = tasks.named("remapJar")
+def releaseJarPath = remapJarTaskProvider.flatMap { it.archiveFile }
 def expectedClassPrefix = "com/yourname/gtstracker/"
 def minimumReleaseJarBytes = 10 * 1024L
 def devJarFile = tasks.named("jar").flatMap { it.archiveFile }
@@ -83,33 +87,28 @@ def requiredReleaseEntries = [
 ]
 
 tasks.register("verifyDevJar") {
-    def devJar = tasks.named("jar")
-    dependsOn devJar
+    dependsOn jarTaskProvider
 
     doLast {
-        File jarFile = devJar.flatMap { it.archiveFile }.get().asFile
-        if (!jarFile.exists()) {
-            throw new GradleException("Dev-Jar invalid: jar does not exist at ${jarFile.absolutePath}")
+        File devJar = devJarPath.get().asFile
+        if (!devJar.exists()) {
+            throw new GradleException("Dev jar validation failed: jar does not exist at ${devJar.absolutePath}")
         }
 
-        def missingEntries = []
-        new java.util.jar.JarFile(jarFile).withCloseable { openedJar ->
-            requiredReleaseEntries.each { entryName ->
-                if (openedJar.getJarEntry(entryName) == null) {
-                    missingEntries << entryName
-                }
-            }
-        }
-
-        if (!missingEntries.isEmpty()) {
-            throw new GradleException("Dev-Jar invalid: missing required entries (${missingEntries.join(', ')}) in ${jarFile.absolutePath}")
+        if (!hasRequiredRuntimeEntries(devJar, requiredReleaseEntries)) {
+            throw new GradleException("Dev jar validation failed: jar is missing required runtime entries (${requiredReleaseEntries.join(', ')}) at ${devJar.absolutePath}")
         }
     }
 }
 
+
+tasks.named("remapJar") {
+    dependsOn tasks.named("verifyDevJar")
+    inputFile = devJarPath.get().asFile
+}
+
 tasks.register("prepareReleaseJar") {
-    def remap = tasks.named("remapJar")
-    dependsOn remap
+    dependsOn remapJarTaskProvider
     dependsOn tasks.named("verifyDevJar")
 
     doLast {
