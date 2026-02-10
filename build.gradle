@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 plugins {
     id 'fabric-loom' version '1.8.13'
     id 'maven-publish'
@@ -54,19 +56,67 @@ tasks.test {
     useJUnitPlatform()
 }
 
-def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+def remapJarTask = tasks.named("remapJar")
 
 tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("remapJar")
+    dependsOn remapJarTask
 
     doLast {
-        File releaseJar = releaseJarPath.get().asFile
+        File releaseJar = remapJarTask.get().archiveFile.get().asFile
         if (!releaseJar.exists()) {
             throw new GradleException("Release jar was not produced: ${releaseJar}")
         }
 
         if (releaseJar.length() <= 0L) {
             throw new GradleException("Release jar is empty: ${releaseJar}")
+        }
+
+        def expectedClientEntrypoint = "com.yourname.gtstracker.GTSTrackerMod"
+        def expectedClassPath = "com/yourname/gtstracker/GTSTrackerMod.class"
+        def expectedDepends = [
+            minecraft    : project.minecraft_version,
+            fabricloader : ">=${project.loader_version}",
+            "fabric-api" : ">=${project.fabric_version}",
+        ]
+
+        def jar = new java.util.jar.JarFile(releaseJar)
+        try {
+            def modJsonEntry = jar.getJarEntry("fabric.mod.json")
+            if (modJsonEntry == null) {
+                throw new GradleException("fabric.mod.json was not found in release jar: ${releaseJar}")
+            }
+
+            def modJson = jar.getInputStream(modJsonEntry).withCloseable { inputStream ->
+                def text = inputStream.getText("UTF-8")
+                try {
+                    return new JsonSlurper().parseText(text)
+                } catch (Exception ex) {
+                    throw new GradleException("fabric.mod.json is not valid JSON", ex)
+                }
+            }
+
+            def clientEntrypoints = modJson?.entrypoints?.client
+            if (!(clientEntrypoints instanceof Collection) || !clientEntrypoints.contains(expectedClientEntrypoint)) {
+                throw new GradleException("entrypoints.client must include '${expectedClientEntrypoint}' but was: ${clientEntrypoints}")
+            }
+
+            if (jar.getJarEntry(expectedClassPath) == null) {
+                throw new GradleException("Release jar is missing class '${expectedClassPath}'")
+            }
+
+            def declaredDepends = modJson?.depends
+            if (!(declaredDepends instanceof Map)) {
+                throw new GradleException("fabric.mod.json depends section must be an object but was: ${declaredDepends?.getClass()?.name}")
+            }
+
+            expectedDepends.each { dependencyName, expectedVersion ->
+                def actualVersion = declaredDepends[dependencyName]
+                if (actualVersion != expectedVersion) {
+                    throw new GradleException("depends.${dependencyName} must be '${expectedVersion}' but was '${actualVersion}'")
+                }
+            }
+        } finally {
+            jar.close()
         }
     }
 }
