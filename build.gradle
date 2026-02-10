@@ -82,9 +82,35 @@ def requiredReleaseEntries = [
     "com/yourname/gtstracker/GTSTrackerMod.class"
 ]
 
+tasks.register("verifyDevJar") {
+    def devJar = tasks.named("jar")
+    dependsOn devJar
+
+    doLast {
+        File jarFile = devJar.flatMap { it.archiveFile }.get().asFile
+        if (!jarFile.exists()) {
+            throw new GradleException("Dev-Jar invalid: jar does not exist at ${jarFile.absolutePath}")
+        }
+
+        def missingEntries = []
+        new java.util.jar.JarFile(jarFile).withCloseable { openedJar ->
+            requiredReleaseEntries.each { entryName ->
+                if (openedJar.getJarEntry(entryName) == null) {
+                    missingEntries << entryName
+                }
+            }
+        }
+
+        if (!missingEntries.isEmpty()) {
+            throw new GradleException("Dev-Jar invalid: missing required entries (${missingEntries.join(', ')}) in ${jarFile.absolutePath}")
+        }
+    }
+}
+
 tasks.register("prepareReleaseJar") {
     def remap = tasks.named("remapJar")
     dependsOn remap
+    dependsOn tasks.named("verifyDevJar")
 
     doLast {
         File remappedJar = remap.get().archiveFile.get().asFile
