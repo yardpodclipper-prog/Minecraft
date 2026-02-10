@@ -52,6 +52,36 @@ pytest -q
 ./gradlew runClient
 ```
 
+
+## Current verification status (headless container)
+
+Automated checks currently pass:
+
+- `./gradlew clean test`
+- `./gradlew build`
+- `pytest -q`
+
+### Testable jar to use right now
+
+Run:
+
+```bash
+./gradlew clean build
+```
+
+Then use this artifact for immediate testing:
+
+- `build/libs/gtstracker-0.1.0-test.jar` (built from the dev jar and contains classes/resources)
+
+> Note: `build/libs/gtstracker-0.1.0.jar` is the remapped release jar and is currently manifest-only in this environment, so use the `-test.jar` for now.
+
+### What is still needed for a release jar
+
+1. Fix `remapJar` output so the published release jar contains classes/resources.
+2. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions above.
+3. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
+4. Re-run `./gradlew clean build` and verify final artifact contents with: `jar tf build/libs/<jar-name>.jar`.
+
 ## Runtime output locations
 
 When running from Gradle, runtime artifacts are typically written under `run/`:
