@@ -3,6 +3,8 @@
 Client-side Fabric mod that parses GTS listings from chat and stores snapshots locally for price/disappearance analysis.
 
 ## Compatibility
+- **JDK:** 21
+- **Supported Minecraft version:** 1.21.1
 
 | Component | Supported version |
 | --- | --- |
