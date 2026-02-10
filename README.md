@@ -78,59 +78,65 @@ Automated checks currently pass:
 - `./gradlew build`
 - `pytest -q`
 
-### Release jar
+### Release jar and validation
 
-Run:
+#### Artifact differences
+
+- `build/devlibs/*-dev.jar` is the **development jar** (readable names/unmapped for production) and is primarily for local dev/runtime tooling.
+- `build/libs/*.jar` is the **release/remapped jar** expected for real client deployment.
+- In CI, if the remapped jar is invalid/missing, the workflow promotes a valid `*-dev.jar` into `build/libs/*.jar` as a fallback so uploads still contain runtime classes/resources.
+
+#### Exact release command
+
+Local release build:
 
 ```bash
 ./gradlew clean build
 ```
 
-Primary artifact for live use:
-
-- `build/libs/gtstracker-0.1.0.jar` (packaged with classes/resources from the built jar)
-
-Validation command:
+CI release build command (from `.github/workflows/build-jar.yml`):
 
 ```bash
-jar tf build/libs/gtstracker-0.1.0.jar
+./gradlew clean build -x test
 ```
 
-You should see classes/resources such as `com/yourname/gtstracker/GTSTrackerMod.class` and `fabric.mod.json`.
+Expected outputs after a successful build:
 
-> Build note: the Loom `remapJar` task remains environment-sensitive in this container, so the `liveJar` packaging step now guarantees a class-containing deliverable at the canonical jar name for deployment testing.
+- `build/libs/gtstracker-<version>.jar` exists and is non-empty.
+- `verifyReleaseJar` passes (it runs after `build` and fails if the release jar is missing/empty).
+- Workflow artifact `gtstracker-jar` uploads successfully from the resolved jar path.
 
-### What is still needed before production rollout
+#### Inspecting jar contents
 
-1. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions below.
-2. Open `/gtstracker gui` and verify no runtime exceptions are written while interacting with panels/widgets.
-3. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
-4. Test in both a clean Fabric profile and the full CobbleGalaxy modpack profile to confirm compatibility.
-Use this artifact for deployment/testing:
-
-- `build/libs/gtstracker-0.1.0.jar` (release jar copied from the built dev artifact with classes/resources)
-
-Optional verification:
+Use `jar tf` to inspect either candidate jar:
 
 ```bash
-jar tf build/libs/gtstracker-0.1.0.jar | head
+jar tf build/libs/gtstracker-<version>.jar
+jar tf build/devlibs/gtstracker-<version>-dev.jar
 ```
 
-The build now includes `verifyReleaseJar`, which validates that the release jar contains required runtime entries (`fabric.mod.json` and `GTSTrackerMod.class`) at the end of `build`.
-Use this artifact for immediate testing/deployment:
+At minimum, confirm entries like:
 
-- `build/libs/gtstracker-0.1.0.jar` (produced by `prepareReleaseJar`; build now fails if this artifact is missing/invalid).
+- `fabric.mod.json`
+- `com/yourname/gtstracker/GTSTrackerMod.class`
 
-Optional debug artifact:
+#### Common failure modes and fixes
 
-- `build/libs/gtstracker-0.1.0-test.jar`
+- **Tiny jar (usually <10 KB):** jar likely contains metadata only or wrong output was selected.
+  - Fix: rerun `./gradlew clean build`, then compare `build/libs` vs `build/devlibs` sizes and inspect both with `jar tf`.
+- **Entrypoint crash on startup:** release jar may be missing required classes/resources.
+  - Fix: inspect `run/logs/latest.log`, then validate jar contains `GTSTrackerMod.class` + `fabric.mod.json`; rebuild and retest in a clean profile.
+- **Unremapped classes in release artifact:** `build/libs/*.jar` may be invalid while `*-dev.jar` has classes.
+  - Fix: run `./gradlew remapJar build`, and if CI still detects bad remap output, use the promoted fallback jar while investigating Loom/remap environment issues.
 
-### What is still needed for final live verification
+#### CI workflow and fast diagnostics
 
-1. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions above.
-2. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
-3. Run `/gtstracker gui` to verify GUI opening/rendering on your target modpack profile.
-4. Re-run `./gradlew clean build` and verify final artifact contents with: `jar tf build/libs/<jar-name>.jar`.
+- CI workflow: [`.github/workflows/build-jar.yml`](.github/workflows/build-jar.yml)
+- Validation tasks to run locally when diagnosing CI failures:
+  - `./gradlew clean build`
+  - `./gradlew remapJar`
+  - `./gradlew verifyReleaseJar`
+  - `jar tf build/libs/gtstracker-<version>.jar`
 
 
 ## Download-ready jar from GitHub (no binary committed)
