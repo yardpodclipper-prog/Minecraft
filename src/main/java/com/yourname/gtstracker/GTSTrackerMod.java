@@ -39,17 +39,24 @@ public final class GTSTrackerMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        instance = this;
-        this.config = ConfigManager.load();
+        LOGGER.info("Starting Cobblemon GTS Tracker initialization.");
 
-        this.databaseManager = new DatabaseManager();
-        this.databaseManager.initialize();
+        try {
+            instance = this;
+            this.config = ConfigManager.load();
 
-        this.ingestionService = new ListingIngestionService(this.databaseManager);
-        this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
-        this.chatMonitor.register();
+            this.databaseManager = new DatabaseManager();
+            this.databaseManager.initialize();
 
-        CommandHandler.register();
-        LOGGER.info("Cobblemon GTS Tracker initialized.");
+            this.ingestionService = new ListingIngestionService(this.databaseManager);
+            this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
+            this.chatMonitor.register();
+
+            CommandHandler.register();
+            LOGGER.info("Cobblemon GTS Tracker initialized successfully.");
+        } catch (Exception exception) {
+            LOGGER.error("Failed to initialize Cobblemon GTS Tracker. The mod may not function correctly.", exception);
+            throw exception;
+        }
     }
 }

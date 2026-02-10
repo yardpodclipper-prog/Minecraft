@@ -61,7 +61,7 @@ Automated checks currently pass:
 - `./gradlew build`
 - `pytest -q`
 
-### Testable jar to use right now
+### Release jar
 
 Run:
 
@@ -69,18 +69,17 @@ Run:
 ./gradlew clean build
 ```
 
-Then use this artifact for immediate testing:
+Use this artifact for deployment/testing:
 
-- `build/libs/gtstracker-0.1.0-test.jar` (built from the dev jar and contains classes/resources)
+- `build/libs/gtstracker-0.1.0.jar` (remapped release jar)
 
-> Note: `build/libs/gtstracker-0.1.0.jar` is the remapped release jar and is currently manifest-only in this environment, so use the `-test.jar` for now.
+Optional verification:
 
-### What is still needed for a release jar
+```bash
+jar tf build/libs/gtstracker-0.1.0.jar | head
+```
 
-1. Fix `remapJar` output so the published release jar contains classes/resources.
-2. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions above.
-3. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
-4. Re-run `./gradlew clean build` and verify final artifact contents with: `jar tf build/libs/<jar-name>.jar`.
+The build now includes `verifyReleaseJar`, which validates that the release jar contains required runtime entries (`fabric.mod.json` and `GTSTrackerMod.class`) before `check` passes.
 
 ## Runtime output locations
 
@@ -89,12 +88,18 @@ When running from Gradle, runtime artifacts are typically written under `run/`:
 - Logs: `run/logs/latest.log`
 - Database: `run/config/gtstracker/gtstracker.db`
 
+### Production diagnostics
+
+If startup or GUI fails in production, GTSTracker now emits explicit error logs during mod initialization and GUI launch, with player-facing fallback messaging for GUI failures. Check `latest.log` first when diagnosing issues.
+
 ## Release checklist for stable modpack usage
 
 - [ ] Jar built from clean repo (`./gradlew clean build`)
 - [ ] Loads in a clean client profile with only Fabric Loader + Fabric API + this mod
 - [ ] Loads in CobbleGalaxy modstack without command/keybinding conflicts
 - [ ] `/gtstracker status` works and DB initializes
+- [ ] `/gtstracker gui` opens the Bloomberg screen without exceptions
+- [ ] No GTSTracker initialization/GUI error entries in `latest.log`
 - [ ] No startup exceptions in `latest.log`
 
 - **Logs:** `run/logs/latest.log` (and related files in `run/logs/`)

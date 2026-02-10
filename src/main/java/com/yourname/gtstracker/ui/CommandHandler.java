@@ -11,6 +11,8 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
@@ -18,6 +20,7 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.arg
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 public final class CommandHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CommandHandler.class);
     private static final ListingSnapshotCache SNAPSHOT_CACHE = new ListingSnapshotCache(ListingSnapshot::empty);
 
     private CommandHandler() {
@@ -60,8 +63,20 @@ public final class CommandHandler {
                     })))
             .then(literal("gui")
                 .executes(context -> {
-                    MinecraftClient client = MinecraftClient.getInstance();
-                    client.setScreen(new com.yourname.gtstracker.ui.bloomberg.BloombergGUI(SNAPSHOT_CACHE));
+                    try {
+                        MinecraftClient client = MinecraftClient.getInstance();
+                        client.setScreen(new com.yourname.gtstracker.ui.bloomberg.BloombergGUI(SNAPSHOT_CACHE));
+                        LOGGER.info("Opened Bloomberg GUI via /{} gui", rootName);
+                    } catch (Exception exception) {
+                        LOGGER.error("Failed to open Bloomberg GUI via /{} gui", rootName, exception);
+                        if (context.getSource().getPlayer() != null) {
+                            context.getSource().getPlayer().sendMessage(
+                                Text.literal("[GTSTracker] Failed to open GUI. Check logs."),
+                                false
+                            );
+                        }
+                        return 0;
+                    }
                     return Command.SINGLE_SUCCESS;
                 }));
     }
