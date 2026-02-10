@@ -23,7 +23,14 @@ public class ListingIngestionService {
             return Optional.empty();
         }
 
-        ListingData listing = GTSMessageParser.parse(message);
+        ListingData listing;
+        try {
+            listing = GTSMessageParser.parse(message);
+        } catch (RuntimeException ex) {
+            GTSTrackerMod.LOGGER.warn("Failed to parse GTS chat message: '{}'", snippet(message), ex);
+            return Optional.empty();
+        }
+
         if (listing == null) {
             return Optional.empty();
         }
@@ -39,5 +46,16 @@ public class ListingIngestionService {
         databaseManager.upsertListing(listing);
         GTSTrackerMod.LOGGER.debug("Ingested listing {} from chat", listing.getId());
         return Optional.of(listing);
+    }
+
+    private static String snippet(String message) {
+        if (message == null) {
+            return "";
+        }
+        String compact = message.replaceAll("\\s+", " ").trim();
+        if (compact.length() <= 120) {
+            return compact;
+        }
+        return compact.substring(0, 117) + "...";
     }
 }
