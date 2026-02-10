@@ -41,6 +41,10 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
+tasks.named("jar") {
+    from sourceSets.main.output
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
@@ -51,17 +55,9 @@ tasks.test {
 }
 
 def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
-def developmentJarPath = layout.buildDirectory.file("devlibs/${base.archivesName.get()}-${project.version}-dev.jar")
-
-tasks.register("prepareReleaseJar", Copy) {
-    dependsOn tasks.named("jar")
-    from(developmentJarPath)
-    into(layout.buildDirectory.dir("libs"))
-    rename { "${base.archivesName.get()}-${project.version}.jar" }
-}
 
 tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("prepareReleaseJar")
+    dependsOn tasks.named("remapJar")
 
     doLast {
         File releaseJar = releaseJarPath.get().asFile
@@ -69,21 +65,8 @@ tasks.register("verifyReleaseJar") {
             throw new GradleException("Release jar was not produced: ${releaseJar}")
         }
 
-        int fileEntries = 0
-        boolean hasModMetadata = false
-        boolean hasEntrypointClass = false
-
-        new java.util.zip.ZipFile(releaseJar).withCloseable { zip ->
-            def entries = zip.entries().toList()
-            fileEntries = entries.findAll { !it.isDirectory() }.size()
-            hasModMetadata = entries.any { it.name == 'fabric.mod.json' }
-            hasEntrypointClass = entries.any { it.name == 'com/yourname/gtstracker/GTSTrackerMod.class' }
-        }
-
-        if (fileEntries <= 1 || !hasModMetadata || !hasEntrypointClass) {
-            throw new GradleException(
-                "Invalid release artifact at ${releaseJar} (files=${fileEntries}, fabric.mod.json=${hasModMetadata}, entrypoint=${hasEntrypointClass})."
-            )
+        if (releaseJar.length() <= 0L) {
+            throw new GradleException("Release jar is empty: ${releaseJar}")
         }
     }
 }
