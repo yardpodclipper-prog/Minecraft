@@ -5,7 +5,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.yourname.gtstracker.GTSTrackerMod;
 import com.yourname.gtstracker.compat.CompatibilityReporter;
-import com.yourname.gtstracker.data.ListingSnapshot;
+import com.yourname.gtstracker.data.DatabaseListingSnapshotProvider;
 import com.yourname.gtstracker.data.ListingSnapshotCache;
 import com.yourname.gtstracker.database.models.ListingData;
 import com.yourname.gtstracker.ui.bloomberg.BloombergGUI;
@@ -37,7 +37,7 @@ public final class CommandHandler {
 
     private static synchronized ListingSnapshotCache getOrCreateSnapshotCache() {
         if (snapshotCache == null || snapshotCache.isClosed()) {
-            snapshotCache = new ListingSnapshotCache(ListingSnapshot::empty);
+            snapshotCache = new ListingSnapshotCache(new DatabaseListingSnapshotProvider(GTSTrackerMod.getInstance().getDatabaseManager()));
         }
         return snapshotCache;
     }
