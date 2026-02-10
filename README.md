@@ -145,6 +145,23 @@ Use one of these download paths instead:
    - Create/push a tag like `v0.1.0`.
    - Download `gtstracker-0.1.0.jar` from the GitHub Release assets.
 
+
+## Dependency packaging policy
+
+Runtime dependency packaging is intentionally split into **embedded mod dependencies** and **external runtime dependencies**:
+
+- **Embedded (inside the mod jar):** Fabric/Cobblemon mod dependencies handled by Loom remapping for mod runtime compatibility.
+- **External (not nested in the mod jar):** `org.xerial:sqlite-jdbc`.
+
+`sqlite-jdbc` is loaded from the runtime classpath (dependency manager/modpack launcher) instead of being nested with Loom `include`. This avoids invalid-semver include processing warnings on `processIncludeJars` and keeps release packaging deterministic.
+
+Release packaging policy:
+
+1. `jar` builds the canonical dev artifact (`build/devlibs/...-dev.jar`) with compiled classes/resources.
+2. `remapJar` still runs and is preferred when it contains required runtime entries.
+3. `prepareReleaseJar` verifies remap output and falls back to the dev jar if remap output is stripped/missing runtime entries.
+4. `verifyReleaseJar` enforces final release-jar validity (`fabric.mod.json` + `GTSTrackerMod.class`) so no build step can silently strip/overwrite deployable output.
+
 ## Runtime output locations
 
 When running from Gradle, runtime artifacts are typically written under `run/`:
