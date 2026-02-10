@@ -5,6 +5,12 @@
 - **JDK:** 21
 - **Supported Minecraft version:** 1.21.1
 
+## Compatibility Matrix
+
+| Target Stack | Minecraft | Fabric Loader | Fabric API | Cobblemon |
+| --- | --- | --- | --- | --- |
+| CobbleGalaxy 1.7.3 | 1.21.1 | 0.18.4 | 0.116.8+1.21.1 | 1.7.3+1.21.1 |
+
 > If your loader/build files target different versions, update this README to match.
 
 ## Commands
