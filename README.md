@@ -69,6 +69,26 @@ Run:
 ./gradlew clean build
 ```
 
+Primary artifact for live use:
+
+- `build/libs/gtstracker-0.1.0.jar` (packaged with classes/resources from the built jar)
+
+Validation command:
+
+```bash
+jar tf build/libs/gtstracker-0.1.0.jar
+```
+
+You should see classes/resources such as `com/yourname/gtstracker/GTSTrackerMod.class` and `fabric.mod.json`.
+
+> Build note: the Loom `remapJar` task remains environment-sensitive in this container, so the `liveJar` packaging step now guarantees a class-containing deliverable at the canonical jar name for deployment testing.
+
+### What is still needed before production rollout
+
+1. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions below.
+2. Open `/gtstracker gui` and verify no runtime exceptions are written while interacting with panels/widgets.
+3. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
+4. Test in both a clean Fabric profile and the full CobbleGalaxy modpack profile to confirm compatibility.
 Use this artifact for deployment/testing:
 
 - `build/libs/gtstracker-0.1.0.jar` (remapped release jar)
@@ -101,6 +121,7 @@ When running from Gradle, runtime artifacts are typically written under `run/`:
 
 - Logs: `run/logs/latest.log`
 - Database: `run/config/gtstracker/gtstracker.db`
+- On startup the mod now logs environment compatibility information (Minecraft/Fabric Loader versions + Cobblemon loaded state) to help production debugging.
 
 ### Production diagnostics
 

@@ -83,6 +83,10 @@ public final class CommandHandler {
                     MinecraftClient client = MinecraftClient.getInstance();
                     try {
                         client.setScreen(new com.yourname.gtstracker.ui.bloomberg.BloombergGUI(SNAPSHOT_CACHE));
+                    } catch (RuntimeException e) {
+                        LOGGER.error("Failed to open Bloomberg GUI.", e);
+                        if (context.getSource().getPlayer() != null) {
+                            context.getSource().getPlayer().sendMessage(Text.literal("GTSTracker GUI failed to open. Check latest.log."), false);
                         GTSTrackerMod.LOGGER.info("Opened Bloomberg GUI successfully.");
                     } catch (RuntimeException e) {
                         GTSTrackerMod.LOGGER.error("Failed to open Bloomberg GUI.", e);

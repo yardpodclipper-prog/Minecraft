@@ -8,6 +8,7 @@ import com.yourname.gtstracker.database.DatabaseManager;
 import com.yourname.gtstracker.ingest.ListingIngestionService;
 import com.yourname.gtstracker.ui.CommandHandler;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,8 @@ public final class GTSTrackerMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        try {
+            instance = this;
         LOGGER.info("Starting Cobblemon GTS Tracker initialization.");
 
         try {
@@ -56,6 +59,14 @@ public final class GTSTrackerMod implements ClientModInitializer {
             this.chatMonitor.register();
 
             CommandHandler.register();
+            LOGGER.info(
+                "Cobblemon GTS Tracker initialized. Environment: mc={}, fabric-loader={}, cobblemonLoaded={}",
+                FabricLoader.getInstance().getModContainer("minecraft").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown"),
+                FabricLoader.getInstance().getModContainer("fabricloader").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown"),
+                FabricLoader.getInstance().isModLoaded("cobblemon")
+            );
+        } catch (RuntimeException e) {
+            LOGGER.error("GTSTracker failed during client initialization. Commands/GUI may be unavailable.", e);
             LOGGER.info("Cobblemon GTS Tracker initialized successfully.");
         } catch (Exception exception) {
             LOGGER.error("Failed to initialize Cobblemon GTS Tracker. The mod may not function correctly.", exception);

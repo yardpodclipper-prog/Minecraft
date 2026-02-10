@@ -19,6 +19,11 @@
     "issues": "https://github.com/yardpodclipper-prog/Minecraft/issues",
     "sources": "https://github.com/yardpodclipper-prog/Minecraft"
   },
+  "custom": {
+    "modmenu": {
+      "badges": []
+    }
+  },
   "depends": {
     "fabricloader": ">=0.18.4",
     "minecraft": "1.21.1",

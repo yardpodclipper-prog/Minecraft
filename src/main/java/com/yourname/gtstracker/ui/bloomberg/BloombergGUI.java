@@ -4,8 +4,11 @@ import com.yourname.gtstracker.data.ListingSnapshotCache;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class BloombergGUI extends Screen {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BloombergGUI.class);
     private static final int BG_COLOR = 0xFF0D1018;
     private static final int HEADER_BG = 0xFF171B27;
     private static final int FOOTER_BG = 0xFF171B27;
@@ -16,6 +19,7 @@ public final class BloombergGUI extends Screen {
 
     private final ListingSnapshotCache snapshotCache;
     private OverviewScreen overview;
+    private boolean refreshErrorLogged;
 
     public BloombergGUI(ListingSnapshotCache snapshotCache) {
         super(Text.literal("GTS Bloomberg"));
@@ -31,7 +35,15 @@ public final class BloombergGUI extends Screen {
 
     @Override
     public void tick() {
-        snapshotCache.refreshIfStale(System.currentTimeMillis(), CACHE_REFRESH_MS);
+        try {
+            snapshotCache.refreshIfStale(System.currentTimeMillis(), CACHE_REFRESH_MS);
+            refreshErrorLogged = false;
+        } catch (RuntimeException e) {
+            if (!refreshErrorLogged) {
+                LOGGER.error("Failed to refresh snapshot cache for Bloomberg GUI.", e);
+                refreshErrorLogged = true;
+            }
+        }
     }
 
     @Override
@@ -53,7 +65,12 @@ public final class BloombergGUI extends Screen {
         renderFooter(context);
 
         if (overview != null) {
-            overview.render(context, this.textRenderer, snapshotCache.getSnapshot());
+            try {
+                overview.render(context, this.textRenderer, snapshotCache.getSnapshot());
+            } catch (RuntimeException e) {
+                LOGGER.error("Failed to render Bloomberg overview panel.", e);
+                context.drawText(textRenderer, Text.literal("GTSTracker GUI error. Check latest.log."), 12, 30, 0xFFFF6B6B, false);
+            }
         }
 
         super.render(context, mouseX, mouseY, delta);
