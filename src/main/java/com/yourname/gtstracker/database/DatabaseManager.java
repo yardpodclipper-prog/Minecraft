@@ -47,6 +47,7 @@ public class DatabaseManager {
             GTSTrackerMod.LOGGER.info("Database initialized at {}", jdbcUrl);
         } catch (Exception e) {
             GTSTrackerMod.LOGGER.error("Failed to initialize SQLite database.", e);
+            throw new IllegalStateException("Failed to initialize SQLite database.", e);
         }
     }
 
@@ -69,6 +70,10 @@ public class DatabaseManager {
 
     public void upsertListing(ListingData listing) {
         if (connection == null) {
+            GTSTrackerMod.LOGGER.error(
+                "upsertListing called before database initialization succeeded; listingId={}",
+                listing == null ? "null" : listing.getId()
+            );
             return;
         }
 

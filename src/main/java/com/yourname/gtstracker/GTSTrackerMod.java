@@ -84,10 +84,10 @@ public final class GTSTrackerMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         instance = this;
-        startupLogger.startupBegin();
+        LOGGER.info("Starting Cobblemon GTS Tracker initialization.");
 
         try {
-            this.config = configLoader.get();
+            this.config = ConfigManager.load();
 
             this.databaseManager = databaseManagerFactory.get();
             this.databaseManager.initialize();
@@ -99,43 +99,17 @@ public final class GTSTrackerMod implements ClientModInitializer {
             this.chatMonitor = chatMonitorFactory.apply(this.ingestionService, this.config);
             this.chatMonitor.register();
 
-            compatibilityLogger.run();
-            commandRegistrar.run();
-
-            startupLogger.startupSuccess();
-        } catch (RuntimeException e) {
-            startupLogger.startupFailure(e);
-            throw e;
-        }
-    }
-
-    interface StartupLogger {
-        void startupBegin();
-
-        void startupSuccess();
-
-        void startupFailure(RuntimeException exception);
-    }
-
-    private static final class DefaultStartupLogger implements StartupLogger {
-        @Override
-        public void startupBegin() {
-            LOGGER.info("Starting Cobblemon GTS Tracker initialization.");
-        }
-
-        @Override
-        public void startupSuccess() {
+            CompatibilityReporter.logStartupCompatibility();
+            CommandHandler.register();
             LOGGER.info(
-                "Cobblemon GTS Tracker initialized. Environment: mc={}, fabric-loader={}, cobblemonLoaded={}",
+                "Cobblemon GTS Tracker initialized. Environment: mc={}, fabric-loader={}, cobblemonLoaded={}.",
                 FabricLoader.getInstance().getModContainer("minecraft").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown"),
                 FabricLoader.getInstance().getModContainer("fabricloader").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown"),
                 FabricLoader.getInstance().isModLoaded("cobblemon")
             );
-        }
-
-        @Override
-        public void startupFailure(RuntimeException exception) {
-            LOGGER.error("GTSTracker failed during client initialization.", exception);
+        } catch (RuntimeException e) {
+            LOGGER.error("GTSTracker failed during client initialization. Startup aborted.", e);
+            throw e;
         }
     }
 }
