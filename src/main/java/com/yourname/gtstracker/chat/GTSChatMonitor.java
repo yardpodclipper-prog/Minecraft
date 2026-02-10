@@ -1,7 +1,7 @@
 package com.yourname.gtstracker.chat;
 
 import com.yourname.gtstracker.config.ConfigModel;
-import com.yourname.gtstracker.service.ListingIngestionService;
+import com.yourname.gtstracker.ingest.ListingIngestionService;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;

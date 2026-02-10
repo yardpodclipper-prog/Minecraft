@@ -2,6 +2,7 @@ package com.yourname.gtstracker;
 
 import com.yourname.gtstracker.config.ConfigManager;
 import com.yourname.gtstracker.config.ConfigModel;
+import com.yourname.gtstracker.chat.GTSChatMonitor;
 import com.yourname.gtstracker.database.DatabaseManager;
 import com.yourname.gtstracker.ingest.ListingIngestionService;
 import com.yourname.gtstracker.ui.CommandHandler;
@@ -18,6 +19,7 @@ public final class GTSTrackerMod implements ClientModInitializer {
     private ConfigModel config;
     private DatabaseManager databaseManager;
     private ListingIngestionService ingestionService;
+    private GTSChatMonitor chatMonitor;
 
     public static GTSTrackerMod getInstance() {
         return instance;
@@ -44,6 +46,8 @@ public final class GTSTrackerMod implements ClientModInitializer {
         this.databaseManager.initialize();
 
         this.ingestionService = new ListingIngestionService(this.databaseManager);
+        this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
+        this.chatMonitor.register();
 
         CommandHandler.register();
         LOGGER.info("Cobblemon GTS Tracker initialized.");
