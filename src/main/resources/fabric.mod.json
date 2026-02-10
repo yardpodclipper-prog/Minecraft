@@ -1,26 +1,22 @@
 {
   "schemaVersion": 1,
-  "id": "gtstracker",
+  "id": "examplemod",
   "version": "${version}",
-  "name": "Cobblemon GTS Tracker",
-  "description": "Client-side Cobblemon GTS tracking and analytics.",
+  "name": "Example Mod",
+  "description": "A Gradle + Fabric Loom template mod project.",
   "authors": [
-    "yourname"
+    "Codex"
   ],
   "license": "MIT",
-  "environment": "client",
+  "environment": "*",
   "entrypoints": {
-    "client": [
-      "com.yourname.gtstracker.GTSTrackerMod"
+    "main": [
+      "com.example.mod.ExampleMod"
     ]
   },
-  "mixins": [
-    "gtstracker.mixins.json"
-  ],
   "depends": {
-    "fabricloader": ">=0.16.0",
-    "fabric": "*",
-    "minecraft": "~1.21.1",
+    "fabricloader": ">=0.16.10",
+    "minecraft": "1.21.1",
     "java": ">=21"
   }
 }

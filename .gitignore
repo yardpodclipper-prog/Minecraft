@@ -2,8 +2,6 @@
 build/
 out/
 run/
-*.iml
 .idea/
-*.log
-__pycache__/
-*.pyc
+*.iml
+gradle/wrapper/gradle-wrapper.jar
