@@ -6,22 +6,13 @@ Client-side Fabric mod that parses GTS listings from chat and stores snapshots l
 - **JDK:** 21
 - **Supported Minecraft version:** 1.21.1
 
-| Component | Supported version |
-| --- | --- |
-| Minecraft | 1.21.1 |
-| Fabric Loader | 0.16.9+ |
-| Fabric API | 0.116.7+1.21.1 |
-| Java | 21 |
+## Compatibility Matrix
 
-> For CobbleGalaxy deployments: verify your exact modpack's Minecraft/Fabric/Cobblemon versions match the table above before distributing this jar.
+| Target Stack | Minecraft | Fabric Loader | Fabric API | Cobblemon |
+| --- | --- | --- | --- | --- |
+| CobbleGalaxy 1.7.3 | 1.21.1 | 0.18.4 | 0.116.8+1.21.1 | 1.7.3+1.21.1 |
 
-## Drag-and-drop installation (Modrinth/CobbleGalaxy users)
-
-1. Install Fabric Loader for the exact Minecraft version above.
-2. Ensure Fabric API is present in your `mods/` folder.
-3. Download the `gtstracker-<version>.jar` release artifact.
-4. Drop the jar into your client `mods/` folder.
-5. Launch client and verify startup log contains `Cobblemon GTS Tracker initialized.`
+> If your loader/build files target different versions, update this README to match.
 
 ## Commands
 
