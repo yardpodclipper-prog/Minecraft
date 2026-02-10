@@ -62,6 +62,12 @@ tasks.test {
 
 def expectedClassPrefix = "com/yourname/gtstracker/"
 def minimumReleaseJarBytes = 10 * 1024L
+def devJarFile = tasks.named("jar").flatMap { it.archiveFile }
+
+tasks.named("remapJar") {
+    dependsOn tasks.named("jar")
+    inputFile = devJarFile.get().asFile
+}
 
 def hasRequiredRuntimeEntries(File jarFile, List<String> requiredEntries) {
     def entries = []
@@ -76,84 +82,35 @@ def requiredReleaseEntries = [
     "com/yourname/gtstracker/GTSTrackerMod.class"
 ]
 
-def logJarEntries(String label, File jarFile) {
-    if (jarFile == null || !jarFile.exists()) {
-        logger.lifecycle("${label}: missing (${jarFile?.absolutePath ?: 'n/a'})")
-        return
-    }
-
-    long size = jarFile.length()
-    logger.lifecycle("${label}: ${jarFile.absolutePath} (${size} bytes)")
-
-    List<String> entries = []
-    new java.util.jar.JarFile(jarFile).withCloseable { openedJar ->
-        entries = openedJar.entries().collect { entry -> entry.name }
-    }
-
-    if (entries.isEmpty()) {
-        logger.lifecycle("${label}: (no entries)")
-        return
-    }
-
-    entries.each { entry -> logger.lifecycle("${label} entry: ${entry}") }
-}
-
-def logCurrentJars() {
-    fileTree("${buildDir}/devlibs") { include("*-dev.jar") }.files.sort().each { File devJar ->
-        logJarEntries("dev-jar", devJar)
-    }
-
-    fileTree("${buildDir}/libs") { include("*.jar") }.files.sort().each { File releaseJar ->
-        logJarEntries("release-jar", releaseJar)
-    }
-}
-
-tasks.named("jar") {
-    doLast {
-        File devJar = archiveFile.get().asFile
-        if (!hasRequiredRuntimeEntries(devJar, requiredReleaseEntries)) {
-            def sourceSet = sourceSets.main
-            def classesDirs = sourceSet.output.classesDirs.files.collect { it.absolutePath }
-            def resourceDir = sourceSet.output.resourcesDir?.absolutePath
-            def processedResourcesDir = tasks.named("processResources").get().destinationDirectory.get().asFile.absolutePath
-
-            throw new GradleException(
-                "Dev jar validation failed at ${devJar.absolutePath}. " +
-                "Missing required entries ${requiredReleaseEntries.join(', ')}. " +
-                "sourceSets.main.output.classesDirs=${classesDirs}; " +
-                "sourceSets.main.output.resourcesDir=${resourceDir}; " +
-                "processResources.destinationDirectory=${processedResourcesDir}"
-            )
-        }
-
-        logCurrentJars()
-    }
-}
-
-tasks.named("remapJar") {
-    dependsOn(tasks.named("jar"))
-    inputFile = tasks.named("jar").flatMap { it.archiveFile }
-
-    doFirst {
-        def configuredInput = inputFile.get().asFile
-        logger.lifecycle("remapJar inputFile: ${configuredInput.absolutePath} (${configuredInput.length()} bytes)")
-    }
+tasks.register("verifyDevJar") {
+    def devJar = tasks.named("jar")
+    dependsOn devJar
 
     doLast {
-        File remappedJar = archiveFile.get().asFile
-        if (!hasRequiredRuntimeEntries(remappedJar, requiredReleaseEntries)) {
-            File configuredInput = inputFile.get().asFile
-            logger.lifecycle("remapJar output is missing required runtime entries. Copying jar input as fallback from ${configuredInput.absolutePath} to ${remappedJar.absolutePath}")
-            ant.copy(file: configuredInput, tofile: remappedJar, overwrite: true)
+        File jarFile = devJar.flatMap { it.archiveFile }.get().asFile
+        if (!jarFile.exists()) {
+            throw new GradleException("Dev-Jar invalid: jar does not exist at ${jarFile.absolutePath}")
         }
 
-        logCurrentJars()
+        def missingEntries = []
+        new java.util.jar.JarFile(jarFile).withCloseable { openedJar ->
+            requiredReleaseEntries.each { entryName ->
+                if (openedJar.getJarEntry(entryName) == null) {
+                    missingEntries << entryName
+                }
+            }
+        }
+
+        if (!missingEntries.isEmpty()) {
+            throw new GradleException("Dev-Jar invalid: missing required entries (${missingEntries.join(', ')}) in ${jarFile.absolutePath}")
+        }
     }
 }
 
 tasks.register("prepareReleaseJar") {
     def remap = tasks.named("remapJar")
     dependsOn remap
+    dependsOn tasks.named("verifyDevJar")
 
     doLast {
         File remappedJar = remap.get().archiveFile.get().asFile
