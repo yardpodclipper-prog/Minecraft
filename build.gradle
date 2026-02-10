@@ -31,7 +31,7 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     modImplementation "maven.modrinth:cobblemon:${project.cobblemon_modrinth_version}"
 
-    include implementation("org.xerial:sqlite-jdbc:3.44.1.0")
+    implementation "org.xerial:sqlite-jdbc:3.44.1.0"
 
     testImplementation platform("org.junit:junit-bom:5.11.4")
     testImplementation "org.junit.jupiter:junit-jupiter"
@@ -50,8 +50,13 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
-tasks.named("jar") {
-    from sourceSets.main.output
+def jarTask = tasks.named("jar")
+
+tasks.named("remapJar") {
+    dependsOn jarTask
+    inputFile.set(jarTask.flatMap { it.archiveFile })
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    archiveClassifier.set("")
 }
 
 java {
@@ -66,9 +71,42 @@ tasks.test {
 def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
 def expectedClassPrefix = "com/yourname/gtstracker/"
 def minimumReleaseJarBytes = 10 * 1024L
+def devJarPath = layout.buildDirectory.file("devlibs/${base.archivesName.get()}-${project.version}-dev.jar")
+
+def hasRequiredRuntimeEntries(File jarFile, List<String> requiredEntries) {
+    def entries = []
+    new java.util.jar.JarFile(jarFile).withCloseable { openedJar ->
+        entries = openedJar.entries().collect { entry -> entry.name }
+    }
+    return requiredEntries.every { requiredEntry -> entries.contains(requiredEntry) }
+}
+
+def requiredReleaseEntries = [
+    "fabric.mod.json",
+    "com/yourname/gtstracker/GTSTrackerMod.class"
+]
+
+tasks.register("prepareReleaseJar") {
+    dependsOn tasks.named("jar")
+    dependsOn tasks.named("remapJar")
+
+    doLast {
+        File remappedJar = releaseJarPath.get().asFile
+        File devJar = devJarPath.get().asFile
+
+        if (!remappedJar.exists() || !hasRequiredRuntimeEntries(remappedJar, requiredReleaseEntries)) {
+            if (!devJar.exists()) {
+                throw new GradleException("Neither remapped nor dev jar is available for release packaging.")
+            }
+
+            ant.copy(file: devJar, tofile: remappedJar, overwrite: true)
+            logger.warn("remapJar output did not contain runtime entries; copied dev jar to release path: ${remappedJar}")
+        }
+    }
+}
 
 tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("remapJar")
+    dependsOn tasks.named("prepareReleaseJar")
 
     doLast {
         File releaseJar = releaseJarPath.get().asFile
