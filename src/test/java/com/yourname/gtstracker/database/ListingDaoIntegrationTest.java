@@ -9,8 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.sqlite.SQLiteDataSource;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -132,18 +130,12 @@ class ListingDaoIntegrationTest {
     }
 
     private static void prepareSchema(String jdbcUrl) throws Exception {
-        com.yourname.gtstracker.database.DatabaseManager schemaManager = new com.yourname.gtstracker.database.DatabaseManager();
-        Connection schemaConnection = DriverManager.getConnection(jdbcUrl);
-        injectConnection(schemaManager, schemaConnection);
-
-        Method createSchema = com.yourname.gtstracker.database.DatabaseManager.class.getDeclaredMethod("createSchema");
-        createSchema.setAccessible(true);
-        createSchema.invoke(schemaManager);
-        schemaConnection.close();
+        com.yourname.gtstracker.database.DatabaseManager schemaManager = new com.yourname.gtstracker.database.DatabaseManager(jdbcUrl);
+        schemaManager.initialize();
     }
 
     private static void injectConnection(com.yourname.gtstracker.database.DatabaseManager manager, Connection connection) throws Exception {
-        Field field = com.yourname.gtstracker.database.DatabaseManager.class.getDeclaredField("connection");
+        var field = com.yourname.gtstracker.database.DatabaseManager.class.getDeclaredField("connection");
         field.setAccessible(true);
         field.set(manager, connection);
     }

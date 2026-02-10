@@ -16,6 +16,8 @@ import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
@@ -23,7 +25,8 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.lit
 
 public final class CommandHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandHandler.class);
-    private static ListingSnapshotCache snapshotCache;
+    private static final ListingSnapshotCache SNAPSHOT_CACHE = new ListingSnapshotCache(ListingSnapshot::empty);
+    private static final DateTimeFormatter TS_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
 
     private CommandHandler() {
     }
@@ -47,10 +50,18 @@ public final class CommandHandler {
             .then(literal("status")
                 .executes(context -> {
                     if (context.getSource().getPlayer() != null) {
-                        String summary = CompatibilityReporter.summarizeRuntime();
+                        var compatibility = CompatibilityReporter.evaluateRuntime();
+                        String dbStatus = GTSTrackerMod.getInstance().getDatabaseManager().getMigrationStatusSummary();
+                        String lastIngest = GTSTrackerMod.getInstance().getIngestionService().getLastSuccessfulIngestAt()
+                            .map(TS_FORMATTER::format)
+                            .orElse("never");
+
                         context.getSource().getPlayer().sendMessage(Text.translatable("command.gtstracker.status"), false);
-                        context.getSource().getPlayer().sendMessage(Text.literal("[GTSTracker] " + summary), false);
-                        GTSTrackerMod.LOGGER.info("Status command invoked: {}", summary);
+                        context.getSource().getPlayer().sendMessage(Text.literal("[GTSTracker] Runtime: " + compatibility.formatStatusLine()), false);
+                        context.getSource().getPlayer().sendMessage(Text.literal("[GTSTracker] DB: " + dbStatus), false);
+                        context.getSource().getPlayer().sendMessage(Text.literal("[GTSTracker] Last ingest: " + lastIngest), false);
+                        GTSTrackerMod.LOGGER.info("Status command invoked: runtime='{}', db='{}', lastIngest='{}'",
+                            compatibility.formatStatusLine(), dbStatus, lastIngest);
                     }
                     return Command.SINGLE_SUCCESS;
                 }))
@@ -68,7 +79,7 @@ public final class CommandHandler {
                                     "Parsed and stored listing: " + listing.get().getDisplayName()), false);
                             } else {
                                 context.getSource().getPlayer().sendMessage(Text.literal(
-                                    "Message did not match GTS parser."), false);
+                                    "Message did not match GTS parser or failed to persist."), false);
                             }
                         }
                         return Command.SINGLE_SUCCESS;
@@ -79,12 +90,11 @@ public final class CommandHandler {
                         MinecraftClient client = MinecraftClient.getInstance();
                         client.setScreen(new BloombergGUI(getOrCreateSnapshotCache(), true));
                         LOGGER.info("Opened Bloomberg GUI via /{} gui", rootName);
-                        return Command.SINGLE_SUCCESS;
-                    } catch (RuntimeException exception) {
-                        LOGGER.error("Failed to open Bloomberg GUI via /{} gui", rootName, exception);
+                    } catch (RuntimeException e) {
+                        LOGGER.error("Failed to open Bloomberg GUI via /{} gui", rootName, e);
                         if (context.getSource().getPlayer() != null) {
                             context.getSource().getPlayer().sendMessage(
-                                Text.literal("[GTSTracker] Failed to open GUI. Check logs."),
+                                Text.literal("[GTSTracker] Failed to open GUI. Check latest.log."),
                                 false
                             );
                         }

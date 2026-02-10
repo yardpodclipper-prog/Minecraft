@@ -10,9 +10,11 @@ import com.yourname.gtstracker.util.ListingFingerprint;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ListingIngestionService {
     private final DatabaseManager databaseManager;
+    private final AtomicLong lastSuccessfulIngestEpochMillis = new AtomicLong(0L);
 
     public ListingIngestionService(DatabaseManager databaseManager) {
         this.databaseManager = databaseManager;
@@ -43,9 +45,20 @@ public class ListingIngestionService {
         listing.setFirstSeen(seenAt.toEpochMilli());
         listing.setLastSeen(seenAt.toEpochMilli());
 
-        databaseManager.upsertListing(listing);
+        boolean persisted = databaseManager.upsertListing(listing);
+        if (!persisted) {
+            GTSTrackerMod.LOGGER.error("Failed to persist ingested listing {}", listing.getId());
+            return Optional.empty();
+        }
+
+        lastSuccessfulIngestEpochMillis.set(seenAt.toEpochMilli());
         GTSTrackerMod.LOGGER.debug("Ingested listing {} from chat", listing.getId());
         return Optional.of(listing);
+    }
+
+    public Optional<Instant> getLastSuccessfulIngestAt() {
+        long value = lastSuccessfulIngestEpochMillis.get();
+        return value <= 0 ? Optional.empty() : Optional.of(Instant.ofEpochMilli(value));
     }
 
     private static String snippet(String message) {

@@ -7,20 +7,38 @@ import com.yourname.gtstracker.database.models.ListingData;
 import com.yourname.gtstracker.database.models.PokemonListing;
 import net.fabricmc.loader.api.FabricLoader;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 public class DatabaseManager {
     private static final String DB_FILE = "gtstracker.db";
 
+    private static final List<MigrationStep> MIGRATIONS = List.of(
+        new MigrationStep(1, "baseline_schema", "db/migration/V1__baseline_schema.sql"),
+        new MigrationStep(2, "listing_indexes", "db/migration/V2__listing_indexes.sql"),
+        new MigrationStep(3, "align_listing_dao_schema", "db/migration/V3__align_listing_dao_schema.sql")
+    );
+
     private final String jdbcUrlOverride;
     private Connection connection;
+    private SchemaStatus schemaStatus = SchemaStatus.uninitialized();
 
     public DatabaseManager() {
         this(null);
@@ -43,15 +61,21 @@ public class DatabaseManager {
                 stmt.execute("PRAGMA journal_mode = WAL");
             }
 
-            createSchema();
-            GTSTrackerMod.LOGGER.info("Database initialized at {}", jdbcUrl);
+            applyMigrations();
+            verifySchemaIntegrity();
+            GTSTrackerMod.LOGGER.info("Database initialized at {} ({})", jdbcUrl, schemaStatus.toStatusLine());
         } catch (Exception e) {
+            schemaStatus = SchemaStatus.failed("initialization error", -1, MIGRATIONS.size(), List.of(e.getMessage()));
             GTSTrackerMod.LOGGER.error("Failed to initialize SQLite database.", e);
         }
     }
 
     public Connection getConnection() {
         return connection;
+    }
+
+    public String getMigrationStatusSummary() {
+        return schemaStatus.toStatusLine();
     }
 
     public int getTotalListingsCount() {
@@ -67,9 +91,9 @@ public class DatabaseManager {
         }
     }
 
-    public void upsertListing(ListingData listing) {
+    public boolean upsertListing(ListingData listing) {
         if (connection == null) {
-            return;
+            return false;
         }
 
         String baseSql = """
@@ -104,6 +128,7 @@ public class DatabaseManager {
             }
 
             connection.commit();
+            return true;
         } catch (SQLException e) {
             try {
                 connection.rollback();
@@ -111,6 +136,7 @@ public class DatabaseManager {
                 GTSTrackerMod.LOGGER.error("Failed to rollback listing upsert.", rollbackError);
             }
             GTSTrackerMod.LOGGER.error("Failed to upsert listing {}", listing.getId(), e);
+            return false;
         } finally {
             try {
                 connection.setAutoCommit(true);
@@ -196,72 +222,170 @@ public class DatabaseManager {
         return "jdbc:sqlite:" + dbPath.toAbsolutePath();
     }
 
-    private void createSchema() throws SQLException {
+    private void applyMigrations() throws SQLException {
+        ensureMigrationTable();
+        int currentVersion = getCurrentSchemaVersion();
+        List<MigrationStep> pending = MIGRATIONS.stream()
+            .filter(step -> step.version() > currentVersion)
+            .sorted(Comparator.comparingInt(MigrationStep::version))
+            .toList();
+
+        for (MigrationStep step : pending) {
+            GTSTrackerMod.LOGGER.info("Applying DB migration V{} ({})", step.version(), step.name());
+            runSqlScript(step.resourcePath());
+            recordMigration(step);
+        }
+
+        int finalVersion = getCurrentSchemaVersion();
+        schemaStatus = SchemaStatus.ready(finalVersion, MIGRATIONS.size(), pending.size(), List.of());
+    }
+
+    private void verifySchemaIntegrity() {
+        if (connection == null) {
+            return;
+        }
+
+        List<String> issues = new ArrayList<>();
+        try {
+            verifyColumns(issues, "listings", "id", "listing_type", "seller", "price", "first_seen", "last_seen", "status", "source_first", "source_last");
+            verifyColumns(issues, "pokemon_listings", "listing_id", "species", "is_shiny", "iv_total");
+            verifyColumns(issues, "item_listings", "listing_id", "item_name", "quantity");
+            verifyIndexes(issues, "idx_listings_status_last_seen", "idx_listings_type_status_last_seen", "idx_pokemon_species_shiny_iv", "idx_item_name");
+        } catch (SQLException e) {
+            issues.add("Schema verification failed unexpectedly: " + e.getMessage());
+        }
+
+        if (!issues.isEmpty()) {
+            issues.forEach(issue -> GTSTrackerMod.LOGGER.error(
+                "Database schema mismatch: {}. Action: back up db and restart to rerun migrations, or manually repair schema.",
+                issue
+            ));
+            schemaStatus = SchemaStatus.failed("schema verification failed", getSafeVersion(), MIGRATIONS.size(), issues);
+        }
+    }
+
+    private int getSafeVersion() {
+        try {
+            return getCurrentSchemaVersion();
+        } catch (SQLException ignored) {
+            return -1;
+        }
+    }
+
+    private void verifyColumns(List<String> issues, String tableName, String... requiredColumns) throws SQLException {
+        DatabaseMetaData metaData = connection.getMetaData();
+        List<String> present = new ArrayList<>();
+        try (ResultSet rs = metaData.getColumns(null, null, tableName, null)) {
+            while (rs.next()) {
+                present.add(rs.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+            }
+        }
+
+        for (String requiredColumn : requiredColumns) {
+            if (!present.contains(requiredColumn.toLowerCase(Locale.ROOT))) {
+                issues.add("missing column " + tableName + "." + requiredColumn);
+            }
+        }
+    }
+
+    private void verifyIndexes(List<String> issues, String... requiredIndexes) throws SQLException {
+        List<String> present = new ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement("SELECT name FROM sqlite_master WHERE type = 'index'");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                present.add(rs.getString("name"));
+            }
+        }
+
+        for (String requiredIndex : requiredIndexes) {
+            if (!present.contains(requiredIndex)) {
+                issues.add("missing index " + requiredIndex);
+            }
+        }
+    }
+
+    private void ensureMigrationTable() throws SQLException {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS listings (
-                    id TEXT PRIMARY KEY,
-                    listing_type TEXT CHECK(listing_type IN ('POKEMON', 'ITEM')) NOT NULL,
-                    seller TEXT NOT NULL,
-                    price INTEGER NOT NULL,
-                    first_seen INTEGER NOT NULL,
-                    last_seen INTEGER NOT NULL,
-                    status TEXT CHECK(status IN ('active', 'sold', 'expired', 'unknown')) DEFAULT 'active',
-                    source_first TEXT CHECK(source_first IN ('chat', 'screen')) NOT NULL,
-                    source_last TEXT CHECK(source_last IN ('chat', 'screen')) NOT NULL
+                CREATE TABLE IF NOT EXISTS schema_version (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at INTEGER NOT NULL
                 )
-            """);
+                """);
+        }
+    }
 
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS pokemon_listings (
-                    listing_id TEXT PRIMARY KEY,
-                    species TEXT NOT NULL,
-                    level INTEGER,
-                    is_shiny BOOLEAN DEFAULT 0,
-                    iv_hp INTEGER,
-                    iv_atk INTEGER,
-                    iv_def INTEGER,
-                    iv_spatk INTEGER,
-                    iv_spdef INTEGER,
-                    iv_speed INTEGER,
-                    iv_total INTEGER GENERATED ALWAYS AS (
-                        COALESCE(iv_hp, 0) + COALESCE(iv_atk, 0) + COALESCE(iv_def, 0) +
-                        COALESCE(iv_spatk, 0) + COALESCE(iv_spdef, 0) + COALESCE(iv_speed, 0)
-                    ) STORED,
-                    nature TEXT,
-                    ability TEXT,
-                    gender TEXT,
-                    pokeball TEXT,
-                    extra_data TEXT,
-                    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
-                )
-            """);
+    private int getCurrentSchemaVersion() throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT COALESCE(MAX(version), 0) AS v FROM schema_version");
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt("v") : 0;
+        }
+    }
 
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS item_listings (
-                    listing_id TEXT PRIMARY KEY,
-                    item_name TEXT NOT NULL,
-                    quantity INTEGER DEFAULT 1,
-                    extra_data TEXT,
-                    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
-                )
-            """);
+    private void runSqlScript(String resourcePath) throws SQLException {
+        String sql = readResource(resourcePath);
+        try (Statement stmt = connection.createStatement()) {
+            for (String statement : sql.split(";")) {
+                String trimmed = statement.trim();
+                if (!trimmed.isEmpty()) {
+                    stmt.execute(trimmed);
+                }
+            }
+        }
+    }
 
-            stmt.execute("""
-                CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status)
-            """);
-            stmt.execute("""
-                CREATE INDEX IF NOT EXISTS idx_listings_type ON listings(listing_type)
-            """);
-            stmt.execute("""
-                CREATE INDEX IF NOT EXISTS idx_listings_last_seen ON listings(last_seen)
-            """);
-            stmt.execute("""
-                CREATE INDEX IF NOT EXISTS idx_pokemon_species ON pokemon_listings(species)
-            """);
-            stmt.execute("""
-                CREATE INDEX IF NOT EXISTS idx_item_name ON item_listings(item_name)
-            """);
+    private void recordMigration(MigrationStep step) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+            "INSERT INTO schema_version(version, name, applied_at) VALUES (?, ?, ?)")) {
+            ps.setInt(1, step.version());
+            ps.setString(2, step.name());
+            ps.setLong(3, Instant.now().toEpochMilli());
+            ps.executeUpdate();
+        }
+    }
+
+    private String readResource(String resourcePath) {
+        InputStream stream = DatabaseManager.class.getClassLoader().getResourceAsStream(resourcePath);
+        if (stream == null) {
+            throw new IllegalStateException("Missing migration resource: " + resourcePath);
+        }
+
+        return new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))
+            .lines()
+            .collect(Collectors.joining("\n"));
+    }
+
+    private record MigrationStep(int version, String name, String resourcePath) {
+    }
+
+    private record SchemaStatus(boolean ready, int version, int expectedVersion, int appliedThisStartup, String message,
+                                List<String> issues) {
+        static SchemaStatus uninitialized() {
+            return new SchemaStatus(false, 0, MIGRATIONS.size(), 0, "not initialized", List.of());
+        }
+
+        static SchemaStatus ready(int version, int expected, int appliedThisStartup, List<String> issues) {
+            return new SchemaStatus(true, version, expected, appliedThisStartup, "ready", issues);
+        }
+
+        static SchemaStatus failed(String message, int version, int expected, List<String> issues) {
+            return new SchemaStatus(false, version, expected, 0, message, issues);
+        }
+
+        String toStatusLine() {
+            String base = String.format(
+                Locale.ROOT,
+                "schema v%d/%d (%s, migrations-applied-this-startup=%d)",
+                version,
+                expectedVersion,
+                ready ? "ready" : message,
+                appliedThisStartup
+            );
+            if (issues.isEmpty()) {
+                return base;
+            }
+            return base + "; issues=" + String.join(" | ", issues);
         }
     }
 }
