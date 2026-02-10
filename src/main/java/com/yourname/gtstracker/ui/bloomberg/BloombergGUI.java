@@ -18,12 +18,18 @@ public final class BloombergGUI extends Screen {
     private static final long CACHE_REFRESH_MS = 1_500L;
 
     private final ListingSnapshotCache snapshotCache;
+    private final boolean shutdownCacheOnClose;
     private OverviewScreen overview;
     private boolean refreshErrorLogged;
 
     public BloombergGUI(ListingSnapshotCache snapshotCache) {
+        this(snapshotCache, false);
+    }
+
+    public BloombergGUI(ListingSnapshotCache snapshotCache, boolean shutdownCacheOnClose) {
         super(Text.literal("GTS Bloomberg"));
         this.snapshotCache = snapshotCache;
+        this.shutdownCacheOnClose = shutdownCacheOnClose;
     }
 
     @Override
@@ -44,6 +50,18 @@ public final class BloombergGUI extends Screen {
                 refreshErrorLogged = true;
             }
         }
+    }
+
+    @Override
+    public void close() {
+        super.close();
+        shutdownCacheIfConfigured();
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        shutdownCacheIfConfigured();
     }
 
     @Override
@@ -74,6 +92,18 @@ public final class BloombergGUI extends Screen {
         }
 
         super.render(context, mouseX, mouseY, delta);
+    }
+
+    private void shutdownCacheIfConfigured() {
+        if (!shutdownCacheOnClose) {
+            return;
+        }
+
+        try {
+            snapshotCache.shutdown();
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Failed shutting down snapshot cache during Bloomberg GUI close.", exception);
+        }
     }
 
     private void renderHeader(DrawContext context) {

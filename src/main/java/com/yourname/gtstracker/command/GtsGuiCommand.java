@@ -11,4 +11,11 @@ public final class GtsGuiCommand {
     private GtsGuiCommand() {
         throw new UnsupportedOperationException("Legacy class is non-runtime. Use ui.CommandHandler.");
     }
+
+    private static synchronized ListingSnapshotCache getOrCreateCache(ListingSnapshotProvider snapshotProvider) {
+        if (snapshotCache == null || snapshotCache.isClosed()) {
+            snapshotCache = new ListingSnapshotCache(snapshotProvider);
+        }
+        return snapshotCache;
+    }
 }

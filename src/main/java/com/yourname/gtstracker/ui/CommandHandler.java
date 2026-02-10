@@ -25,7 +25,7 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.lit
 
 public final class CommandHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandHandler.class);
-    private static final ListingSnapshotCache SNAPSHOT_CACHE = new ListingSnapshotCache(ListingSnapshot::empty);
+    private static ListingSnapshotCache snapshotCache;
 
     static final List<String> ROOT_ALIASES = List.of("gts", "gtstracker");
 
@@ -92,7 +92,6 @@ public final class CommandHandler {
                         }
                         return 0;
                     }
-                    return Command.SINGLE_SUCCESS;
                 }));
     }
 }
