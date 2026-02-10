@@ -1,3 +1,12 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.ow2.asm:asm:9.7.1"
+    }
+}
+
 plugins {
     id 'fabric-loom' version '1.8.13'
     id 'maven-publish'
@@ -55,6 +64,8 @@ tasks.test {
 }
 
 def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+def expectedClassPrefix = "com/yourname/gtstracker/"
+def minimumReleaseJarBytes = 10 * 1024L
 
 tasks.register("verifyReleaseJar") {
     dependsOn tasks.named("remapJar")
@@ -62,11 +73,56 @@ tasks.register("verifyReleaseJar") {
     doLast {
         File releaseJar = releaseJarPath.get().asFile
         if (!releaseJar.exists()) {
-            throw new GradleException("Release jar was not produced: ${releaseJar}")
+            throw new GradleException("Release jar validation failed: jar does not exist at ${releaseJar.absolutePath}")
         }
 
-        if (releaseJar.length() <= 0L) {
-            throw new GradleException("Release jar is empty: ${releaseJar}")
+        long jarSize = releaseJar.length()
+        if (jarSize < minimumReleaseJarBytes) {
+            throw new GradleException("Release jar validation failed: jar size (${jarSize} bytes) is below threshold (${minimumReleaseJarBytes} bytes) at ${releaseJar.absolutePath}")
+        }
+
+        def jarFile = new java.util.jar.JarFile(releaseJar)
+        try {
+            if (jarFile.getJarEntry("fabric.mod.json") == null) {
+                throw new GradleException("Release jar validation failed: missing fabric.mod.json in ${releaseJar.absolutePath}")
+            }
+
+            List classEntries = jarFile.entries()
+                .findAll { !it.isDirectory() && it.name.endsWith('.class') }
+                .collect { it.name }
+
+            if (classEntries.isEmpty()) {
+                throw new GradleException("Release jar validation failed: no class files found in ${releaseJar.absolutePath}")
+            }
+
+            List expectedNamespaceClasses = classEntries.findAll { it.startsWith(expectedClassPrefix) }
+            if (expectedNamespaceClasses.isEmpty()) {
+                throw new GradleException("Release jar validation failed: no classes found under ${expectedClassPrefix}**.class in ${releaseJar.absolutePath}")
+            }
+
+            def classReaderClass = buildscript.classLoader.loadClass("org.objectweb.asm.ClassReader")
+            def classReaderCtor = classReaderClass.getConstructor(java.io.InputStream)
+
+            List namespaceMismatches = []
+            expectedNamespaceClasses.each { String entryName ->
+                def jarEntry = jarFile.getJarEntry(entryName)
+                def inputStream = jarFile.getInputStream(jarEntry)
+                try {
+                    def classReader = classReaderCtor.newInstance(inputStream)
+                    String internalName = classReader.getClassName()
+                    if (!internalName.startsWith(expectedClassPrefix)) {
+                        namespaceMismatches << "${entryName} declares ${internalName}"
+                    }
+                } finally {
+                    inputStream.close()
+                }
+            }
+
+            if (!namespaceMismatches.isEmpty()) {
+                throw new GradleException("Release jar validation failed: namespace mismatch for ${namespaceMismatches.size()} class(es) in ${releaseJar.absolutePath}. Sample: ${namespaceMismatches.take(5).join(', ')}")
+            }
+        } finally {
+            jarFile.close()
         }
     }
 }
