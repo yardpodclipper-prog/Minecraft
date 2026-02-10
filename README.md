@@ -5,6 +5,7 @@ Client-side Fabric mod that parses GTS listings from chat and stores snapshots l
 ## Compatibility
 - **JDK:** 21
 - **Supported Minecraft version:** 1.21.1
+- **Official build system:** Gradle (Fabric Loom)
 
 ## Compatibility Matrix
 
@@ -30,6 +31,8 @@ The mod registers both namespaced and legacy command roots:
 ```bash
 ./gradlew build
 ```
+
+> Maven is not used for this mod runtime/build pipeline.
 
 ### Java tests
 
@@ -70,8 +73,9 @@ When running from Gradle, runtime artifacts are typically written under `run/`:
 ## Known-good test profile versions
 
 - **Minecraft:** `1.21.1`
-- **Fabric Loader:** `0.16.9`
-- **Fabric API:** `0.116.7+1.21.1`
+- **Fabric Loader:** `0.18.4`
+- **Fabric API:** `0.116.8+1.21.1`
+- **Cobblemon:** `1.7.3+1.21.1`
 - **Cobblemon GTS Tracker:** `0.1.0`
 - **Client commands:** `/gts ...` and `/gtstracker ...` are both registered and point to the same handlers.
 
