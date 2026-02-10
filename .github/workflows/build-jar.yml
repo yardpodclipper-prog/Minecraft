@@ -65,7 +65,7 @@ jobs:
           echo "Selected release candidate: $JAR_PATH (${JAR_SIZE} bytes)"
           echo "path=$JAR_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Verify release artifact
+      - name: Verify release artifact (entrypoints + remap leakage)
         run: ./scripts/verify-release-artifact.sh "${{ steps.release_jar.outputs.path }}"
 
       - name: Upload jar artifact
