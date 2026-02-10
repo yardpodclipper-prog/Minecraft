@@ -60,7 +60,8 @@ tasks.test {
     useJUnitPlatform()
 }
 
-def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+def remapJarTaskProvider = tasks.named("remapJar")
+def releaseJarPath = remapJarTaskProvider.flatMap { it.archiveFile }
 def expectedClassPrefix = "com/yourname/gtstracker/"
 def minimumReleaseJarBytes = 10 * 1024L
 
@@ -78,7 +79,7 @@ def requiredReleaseEntries = [
 ]
 
 tasks.register("prepareReleaseJar") {
-    dependsOn tasks.named("remapJar")
+    dependsOn remapJarTaskProvider
 
     doLast {
         File remappedJar = releaseJarPath.get().asFile
