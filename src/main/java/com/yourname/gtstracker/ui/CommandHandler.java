@@ -19,25 +19,18 @@ public final class CommandHandler {
     }
 
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            dispatcher.register(buildRootCommand("gtstracker"));
-            dispatcher.register(buildRootCommand("gts"));
-        });
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+            dispatcher.register(buildRootCommand("gts"))
+        );
+
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+            dispatcher.register(buildRootCommand("gtstracker"))
+        );
     }
 
-    private static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String rootLiteral) {
-        return literal(rootLiteral)
-            .then(literal("status")
-                .executes(context -> {
-                    if (context.getSource().getPlayer() != null) {
-                        int count = GTSTrackerMod.getInstance().getDatabaseManager().getTotalListingsCount();
-                        context.getSource().getPlayer().sendMessage(Text.literal(
-                            "GTS Tracker ready | Listings in DB: " + count), false);
-                    }
-                    return Command.SINGLE_SUCCESS;
-                }))
-            .then(literal("ingesttest")
-                .then(argument("message", StringArgumentType.greedyString())
+    private static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String name) {
+        return literal(name)
+                .then(literal("status")
                     .executes(context -> {
                         if (context.getSource().getPlayer() != null) {
                             String raw = StringArgumentType.getString(context, "message");
@@ -54,6 +47,7 @@ public final class CommandHandler {
                             }
                         }
                         return Command.SINGLE_SUCCESS;
+                    }));
                     })))
             .then(literal("next")
                 .executes(context -> {
