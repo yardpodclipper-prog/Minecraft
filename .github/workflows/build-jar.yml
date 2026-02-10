@@ -45,6 +45,9 @@ jobs:
             if [ "$CANDIDATE_SIZE" -lt 10240 ]; then
               continue
             fi
+            if [[ "$CANDIDATE_PATH" == *-dev.jar ]]; then
+              continue
+            fi
             if jar tf "$CANDIDATE_PATH" | grep -q '^fabric.mod.json$'; then
               JAR_PATH="$CANDIDATE_PATH"
               break
