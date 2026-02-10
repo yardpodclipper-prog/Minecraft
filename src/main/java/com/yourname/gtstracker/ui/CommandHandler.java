@@ -2,9 +2,11 @@ package com.yourname.gtstracker.ui;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.yourname.gtstracker.GTSTrackerMod;
 import com.yourname.gtstracker.database.models.ListingData;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.text.Text;
 
 import java.util.Optional;
@@ -18,7 +20,16 @@ public final class CommandHandler {
 
     public static void register() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
-            dispatcher.register(literal("gts")
+            dispatcher.register(buildRootCommand("gts"))
+        );
+
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+            dispatcher.register(buildRootCommand("gtstracker"))
+        );
+    }
+
+    private static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String name) {
+        return literal(name)
                 .then(literal("status")
                     .executes(context -> {
                         if (context.getSource().getPlayer() != null) {
@@ -62,8 +73,6 @@ public final class CommandHandler {
                                 "Bloomberg GUI scaffold is not wired yet."), false);
                         }
                         return Command.SINGLE_SUCCESS;
-                    }))
-            )
-        );
+                    }));
     }
 }
