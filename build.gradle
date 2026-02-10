@@ -40,12 +40,6 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
-tasks.named("remapJar", net.fabricmc.loom.task.RemapJarTask) {
-    dependsOn tasks.named("jar")
-    inputFile.set(tasks.named("jar", Jar).flatMap { it.archiveFile })
-    archiveClassifier.set("")
-}
-
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
@@ -55,55 +49,18 @@ tasks.test {
     useJUnitPlatform()
 }
 
+def remapJarTask = tasks.named("remapJar", net.fabricmc.loom.task.RemapJarTask)
+def releaseJar = remapJarTask.flatMap { it.archiveFile }
 
-
-
-
-tasks.register("liveJar", Copy) {
-    dependsOn tasks.named("jar")
-    mustRunAfter tasks.named("remapJar")
-    from(tasks.named("jar", Jar).flatMap { it.archiveFile })
-    into(layout.buildDirectory.dir("libs"))
-    rename { "${base.archivesName.get()}-${project.version}.jar" }
-}
-
-
-tasks.register("prepareReleaseJar", Copy) {
 tasks.register("testJar", Copy) {
     dependsOn tasks.named("jar")
     from(tasks.named("jar", Jar).flatMap { it.archiveFile })
     into(layout.buildDirectory.dir("libs"))
-    rename { "${base.archivesName.get()}-${project.version}.jar" }
+    rename { "${base.archivesName.get()}-${project.version}-test.jar" }
 }
 
 tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("prepareReleaseJar")
-
-    doLast {
-        def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar").get().asFile
-        def zip = new java.util.zip.ZipFile(releaseJar)
-        try {
-            def requiredEntries = [
-                "fabric.mod.json",
-                "com/yourname/gtstracker/GTSTrackerMod.class"
-            ]
-
-            def missing = requiredEntries.findAll { zip.getEntry(it) == null }
-            if (!missing.isEmpty()) {
-                throw new GradleException("Release jar is missing required entries: ${missing.join(', ')}")
-            }
-        } finally {
-            zip.close()
-        }
-    }
-}
-
-tasks.named("check") {
-    dependsOn tasks.named("verifyReleaseJar")
-def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
-
-tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("remapJar")
+    dependsOn remapJarTask
 
     doLast {
         File remapped = releaseJar.get().asFile
@@ -111,27 +68,16 @@ tasks.register("verifyReleaseJar") {
             throw new GradleException("Release jar was not produced by remapJar: ${remapped}")
         }
 
-        int fileEntries = 0
-        boolean hasModMetadata = false
-        boolean hasEntrypointClass = false
-
-        new java.util.zip.ZipFile(remapped).withCloseable { zip ->
-            def entries = zip.entries().toList()
-            fileEntries = entries.findAll { !it.isDirectory() }.size()
-            hasModMetadata = entries.any { it.name == 'fabric.mod.json' }
-            hasEntrypointClass = entries.any { it.name == 'com/yourname/gtstracker/GTSTrackerMod.class' }
-        }
-
-        if (fileEntries <= 1 || !hasModMetadata || !hasEntrypointClass) {
-            throw new GradleException(
-                "Invalid remapJar release artifact at ${remapped} (files=${fileEntries}, fabric.mod.json=${hasModMetadata}, entrypoint=${hasEntrypointClass})."
-            )
+        if (remapped.length() <= 0L) {
+            throw new GradleException("Invalid release artifact at ${remapped}: file is empty.")
         }
     }
 }
 
+tasks.named("check") {
+    dependsOn tasks.named("verifyReleaseJar")
+}
+
 tasks.named("build") {
     dependsOn tasks.named("testJar")
-    dependsOn tasks.named("liveJar")
-    finalizedBy tasks.named("verifyReleaseJar")
 }

@@ -1,6 +1,7 @@
 package com.yourname.gtstracker.ui;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.yourname.gtstracker.GTSTrackerMod;
@@ -16,6 +17,7 @@ import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Optional;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
@@ -25,24 +27,22 @@ public final class CommandHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandHandler.class);
     private static ListingSnapshotCache snapshotCache;
 
+    static final List<String> ROOT_ALIASES = List.of("gts", "gtstracker");
+
     private CommandHandler() {
     }
 
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            dispatcher.register(buildRootCommand("gts"));
-            dispatcher.register(buildRootCommand("gtstracker"));
-        });
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> registerAliasCommands(dispatcher));
     }
 
-    private static synchronized ListingSnapshotCache getOrCreateSnapshotCache() {
-        if (snapshotCache == null || snapshotCache.isClosed()) {
-            snapshotCache = new ListingSnapshotCache(ListingSnapshot::empty);
+    static void registerAliasCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
+        for (String rootAlias : ROOT_ALIASES) {
+            dispatcher.register(buildRootCommand(rootAlias));
         }
-        return snapshotCache;
     }
 
-    private static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String rootName) {
+    static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String rootName) {
         return literal(rootName)
             .then(literal("status")
                 .executes(context -> {
@@ -64,11 +64,15 @@ public final class CommandHandler {
                                 .ingestChatMessage(raw);
 
                             if (listing.isPresent()) {
-                                context.getSource().getPlayer().sendMessage(Text.literal(
-                                    "Parsed and stored listing: " + listing.get().getDisplayName()), false);
+                                context.getSource().getPlayer().sendMessage(
+                                    Text.literal("Parsed and stored listing: " + listing.get().getDisplayName()),
+                                    false
+                                );
                             } else {
-                                context.getSource().getPlayer().sendMessage(Text.literal(
-                                    "Message did not match GTS parser."), false);
+                                context.getSource().getPlayer().sendMessage(
+                                    Text.literal("Message did not match GTS parser."),
+                                    false
+                                );
                             }
                         }
                         return Command.SINGLE_SUCCESS;
@@ -76,10 +80,8 @@ public final class CommandHandler {
             .then(literal("gui")
                 .executes(context -> {
                     try {
-                        MinecraftClient client = MinecraftClient.getInstance();
-                        client.setScreen(new BloombergGUI(getOrCreateSnapshotCache(), true));
+                        MinecraftClient.getInstance().setScreen(new BloombergGUI(SNAPSHOT_CACHE));
                         LOGGER.info("Opened Bloomberg GUI via /{} gui", rootName);
-                        return Command.SINGLE_SUCCESS;
                     } catch (RuntimeException exception) {
                         LOGGER.error("Failed to open Bloomberg GUI via /{} gui", rootName, exception);
                         if (context.getSource().getPlayer() != null) {

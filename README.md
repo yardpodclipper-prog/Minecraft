@@ -34,12 +34,13 @@ Legacy duplicate classes that previously existed in `com.yourname.gtstracker` we
 
 ## Commands
 
-The mod registers both namespaced and legacy command roots:
+`ui.CommandHandler` is the canonical command registrar and owns both root aliases in one place.
 
-- `/gtstracker status`
-- `/gtstracker ingesttest <message>`
-- `/gtstracker gui`
-- `/gts ...` (legacy alias)
+Supported commands (available under both `/gtstracker` and `/gts`):
+
+- `status`
+- `ingesttest <message>`
+- `gui`
 
 ## Build and test
 
