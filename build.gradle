@@ -58,31 +58,35 @@ tasks.register("testJar", Copy) {
 
 def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
 
-tasks.register("ensureReleaseJarUsable") {
+tasks.register("verifyReleaseJar") {
     dependsOn tasks.named("remapJar")
 
     doLast {
         File remapped = releaseJar.get().asFile
-        int entries = 0
-
-        if (remapped.exists()) {
-            new java.util.zip.ZipFile(remapped).withCloseable { zip ->
-                entries = zip.entries().findAll { !it.isDirectory() }.size()
-            }
+        if (!remapped.exists()) {
+            throw new GradleException("Release jar was not produced by remapJar: ${remapped}")
         }
 
-        if (entries <= 1) {
-            logger.warn("remapJar output appears empty ({} entries). Replacing release artifact with dev jar fallback.", entries)
-            copy {
-                from(tasks.named("jar", Jar).flatMap { it.archiveFile })
-                into(remapped.parentFile)
-                rename { remapped.name }
-            }
+        int fileEntries = 0
+        boolean hasModMetadata = false
+        boolean hasEntrypointClass = false
+
+        new java.util.zip.ZipFile(remapped).withCloseable { zip ->
+            def entries = zip.entries().toList()
+            fileEntries = entries.findAll { !it.isDirectory() }.size()
+            hasModMetadata = entries.any { it.name == 'fabric.mod.json' }
+            hasEntrypointClass = entries.any { it.name == 'com/yourname/gtstracker/GTSTrackerMod.class' }
+        }
+
+        if (fileEntries <= 1 || !hasModMetadata || !hasEntrypointClass) {
+            throw new GradleException(
+                "Invalid remapJar release artifact at ${remapped} (files=${fileEntries}, fabric.mod.json=${hasModMetadata}, entrypoint=${hasEntrypointClass})."
+            )
         }
     }
 }
 
 tasks.named("build") {
     dependsOn tasks.named("testJar")
-    finalizedBy tasks.named("ensureReleaseJarUsable")
+    finalizedBy tasks.named("verifyReleaseJar")
 }

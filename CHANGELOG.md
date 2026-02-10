@@ -8,4 +8,4 @@
 
 ### Fixed
 - Removed the ModMenu `library` badge from `fabric.mod.json` so this mod is represented correctly in modpacks.
-- Added a release-artifact safeguard that replaces an unexpectedly empty remap output with a usable fallback jar at `build/libs/gtstracker-<version>.jar`.
+- Reworked release artifact validation so `build/libs/gtstracker-<version>.jar` must come from `remapJar` and build fails when the remapped output is missing/invalid (instead of copying the dev jar).

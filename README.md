@@ -71,7 +71,7 @@ Run:
 
 Use this artifact for immediate testing/deployment:
 
-- `build/libs/gtstracker-0.1.0.jar` (release path; build now auto-falls back to the dev jar when remap output is unexpectedly empty).
+- `build/libs/gtstracker-0.1.0.jar` (produced by Loom `remapJar`; build now fails if this artifact is missing/invalid).
 
 Optional debug artifact:
 
