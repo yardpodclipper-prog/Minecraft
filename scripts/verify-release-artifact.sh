@@ -83,36 +83,34 @@ while IFS= read -r entrypoint; do
   fi
 done <<< "$ENTRYPOINT_CLASSES"
 
-TMP_DIR=$(mktemp -d)
-cleanup() {
-  rm -rf "$TMP_DIR"
-}
-trap cleanup EXIT
 
-mapfile -t TRACKER_CLASSES < <(jar tf "$ARTIFACT_PATH" | grep '^com/yourname/gtstracker/.*\.class$' || true)
+python3 - <<'PYCODE' "$ARTIFACT_PATH"
+import re
+import sys
+import zipfile
 
-if (( ${#TRACKER_CLASSES[@]} == 0 )); then
-  echo "No classes found under com/yourname/gtstracker in artifact: $ARTIFACT_PATH"
-  exit 1
-fi
+artifact = sys.argv[1]
+# Named Yarn classes use package paths like net/minecraft/text/Text.
+# Intermediary runtime classes are typically net/minecraft/class_<id>.
+named_minecraft_pattern = re.compile(rb"net/minecraft/(?!class_)[a-z0-9_]+/[A-Z][A-Za-z0-9_$]*")
 
-LEAKED_MAPPINGS=()
-for class_file in "${TRACKER_CLASSES[@]}"; do
-  class_output_path="$TMP_DIR/$class_file"
-  mkdir -p "$(dirname "$class_output_path")"
-  unzip -p "$ARTIFACT_PATH" "$class_file" > "$class_output_path"
+violations = []
+with zipfile.ZipFile(artifact) as zf:
+    for name in zf.namelist():
+        if not name.startswith("com/yourname/gtstracker/") or not name.endswith('.class'):
+            continue
+        data = zf.read(name)
+        if named_minecraft_pattern.search(data):
+            violations.append(name)
 
-  if javap -verbose "$class_output_path" | grep -q 'net/minecraft/'; then
-    LEAKED_MAPPINGS+=("$class_file")
-  fi
-done
-
-if (( ${#LEAKED_MAPPINGS[@]} > 0 )); then
-  echo "Named-mapping leakage detected in release artifact bytecode."
-  echo "Likely cause: dev jar selected / remap missing."
-  echo "Classes containing net/minecraft/ symbols:"
-  printf '  - %s\n' "${LEAKED_MAPPINGS[@]}"
-  exit 1
-fi
+if violations:
+    sample = ', '.join(violations[:5])
+    print(
+        "Detected named-mapping Minecraft class references in release artifact classes "
+        f"(sample: {sample}). This usually means a dev jar was selected or remapping failed.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PYCODE
 
 echo "Release artifact checks passed: $ARTIFACT_PATH (${ARTIFACT_SIZE} bytes)"

@@ -96,7 +96,7 @@ Local release build:
 CI release build command (from `.github/workflows/build-jar.yml`):
 
 ```bash
-./gradlew clean build -x test
+./gradlew clean build
 ```
 
 Expected outputs after a successful build:
@@ -125,8 +125,8 @@ At minimum, confirm entries like:
   - Fix: rerun `./gradlew clean build`, then compare `build/libs` vs `build/devlibs` sizes and inspect both with `jar tf`.
 - **Entrypoint crash on startup:** release jar may be missing required classes/resources.
   - Fix: inspect `run/logs/latest.log`, then validate jar contains `GTSTrackerMod.class` + `fabric.mod.json`; rebuild and retest in a clean profile.
-- **Unremapped classes in release artifact:** `build/libs/*.jar` may be invalid while `*-dev.jar` has classes.
-  - Fix: run `./gradlew remapJar build` and resolve remapping errors until a valid `build/libs/*.jar` is produced.
+- **Unremapped classes in release artifact:** remapping failed and the build should fail before publication.
+  - Fix: run `./gradlew clean remapJar verifyReleaseJar`, inspect Loom/remap logs, and do not publish until remap output is valid.
 
 #### CI workflow and fast diagnostics
 
