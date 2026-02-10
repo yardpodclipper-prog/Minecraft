@@ -3,7 +3,7 @@
 ## Requirements
 
 - **JDK:** 21
-- **Supported Minecraft version:** 1.20.1
+- **Supported Minecraft version:** 1.21.1
 
 > If your loader/build files target different versions, update this README to match.
 
