@@ -7,6 +7,7 @@ import com.yourname.gtstracker.database.DatabaseManager;
 import com.yourname.gtstracker.ingest.ListingIngestionService;
 import com.yourname.gtstracker.ui.CommandHandler;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,17 +40,27 @@ public final class GTSTrackerMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        instance = this;
-        this.config = ConfigManager.load();
+        try {
+            instance = this;
+            this.config = ConfigManager.load();
 
-        this.databaseManager = new DatabaseManager();
-        this.databaseManager.initialize();
+            this.databaseManager = new DatabaseManager();
+            this.databaseManager.initialize();
 
-        this.ingestionService = new ListingIngestionService(this.databaseManager);
-        this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
-        this.chatMonitor.register();
+            this.ingestionService = new ListingIngestionService(this.databaseManager);
+            this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
+            this.chatMonitor.register();
 
-        CommandHandler.register();
-        LOGGER.info("Cobblemon GTS Tracker initialized.");
+            CommandHandler.register();
+            LOGGER.info(
+                "Cobblemon GTS Tracker initialized. Environment: mc={}, fabric-loader={}, cobblemonLoaded={}",
+                FabricLoader.getInstance().getModContainer("minecraft").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown"),
+                FabricLoader.getInstance().getModContainer("fabricloader").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown"),
+                FabricLoader.getInstance().isModLoaded("cobblemon")
+            );
+        } catch (RuntimeException e) {
+            LOGGER.error("GTSTracker failed during client initialization. Commands/GUI may be unavailable.", e);
+            throw e;
+        }
     }
 }

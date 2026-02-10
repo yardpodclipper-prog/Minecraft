@@ -21,9 +21,7 @@
   },
   "custom": {
     "modmenu": {
-      "badges": [
-        "library"
-      ]
+      "badges": []
     }
   },
   "depends": {

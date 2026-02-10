@@ -40,6 +40,12 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
+tasks.named("remapJar", net.fabricmc.loom.task.RemapJarTask) {
+    dependsOn tasks.named("jar")
+    inputFile.set(tasks.named("jar", Jar).flatMap { it.archiveFile })
+    archiveClassifier.set("")
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
@@ -52,6 +58,17 @@ tasks.test {
 
 
 
+
+
+tasks.register("liveJar", Copy) {
+    dependsOn tasks.named("jar")
+    mustRunAfter tasks.named("remapJar")
+    from(tasks.named("jar", Jar).flatMap { it.archiveFile })
+    into(layout.buildDirectory.dir("libs"))
+    rename { "${base.archivesName.get()}-${project.version}.jar" }
+}
+
+
 tasks.register("testJar", Copy) {
     dependsOn tasks.named("jar")
     from(tasks.named("jar", Jar).flatMap { it.archiveFile })
@@ -61,4 +78,5 @@ tasks.register("testJar", Copy) {
 
 tasks.named("build") {
     dependsOn tasks.named("testJar")
+    dependsOn tasks.named("liveJar")
 }
