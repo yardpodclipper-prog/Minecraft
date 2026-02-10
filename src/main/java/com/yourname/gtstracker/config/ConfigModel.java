@@ -1,16 +1,16 @@
 package com.yourname.gtstracker.config;
 
-/**
- * Runtime configuration for GTSTracker client features.
- */
 public class ConfigModel {
-    private boolean chatMonitoringEnabled = true;
+    public boolean chatMonitoringEnabled = true;
+    public boolean autoScanOnGTSOpen = true;
+    public int scanIntervalSeconds = 60;
 
-    public boolean isChatMonitoringEnabled() {
-        return chatMonitoringEnabled;
-    }
+    public double alertThresholdPercent = 20.0;
+    public double spikeThresholdPercent = 50.0;
 
-    public void setChatMonitoringEnabled(boolean chatMonitoringEnabled) {
-        this.chatMonitoringEnabled = chatMonitoringEnabled;
-    }
+    public int dataRetentionDays = 90;
+    public int minSamplesForAverage = 5;
+
+    public boolean showOverlayOnGTS = true;
+    public boolean bloombergTheme = true;
 }
