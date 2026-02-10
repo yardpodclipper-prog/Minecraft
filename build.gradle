@@ -66,6 +66,12 @@ def remapJarTaskProvider = tasks.named("remapJar")
 def releaseJarPath = remapJarTaskProvider.flatMap { it.archiveFile }
 def expectedClassPrefix = "com/yourname/gtstracker/"
 def minimumReleaseJarBytes = 10 * 1024L
+def devJarFile = tasks.named("jar").flatMap { it.archiveFile }
+
+tasks.named("remapJar") {
+    dependsOn tasks.named("jar")
+    inputFile = devJarFile.get().asFile
+}
 
 def hasRequiredRuntimeEntries(File jarFile, List<String> requiredEntries) {
     def entries = []
@@ -106,7 +112,7 @@ tasks.register("prepareReleaseJar") {
     dependsOn tasks.named("verifyDevJar")
 
     doLast {
-        File remappedJar = releaseJarPath.get().asFile
+        File remappedJar = remap.get().archiveFile.get().asFile
         if (!remappedJar.exists()) {
             throw new GradleException("Remapped release jar does not exist at ${remappedJar.absolutePath}. Refusing to publish a dev jar fallback.")
         }
@@ -121,7 +127,7 @@ tasks.register("verifyReleaseJar") {
     dependsOn tasks.named("prepareReleaseJar")
 
     doLast {
-        File releaseJar = releaseJarPath.get().asFile
+        File releaseJar = tasks.named("remapJar").get().archiveFile.get().asFile
         if (!releaseJar.exists()) {
             throw new GradleException("Release jar validation failed: jar does not exist at ${releaseJar.absolutePath}")
         }
