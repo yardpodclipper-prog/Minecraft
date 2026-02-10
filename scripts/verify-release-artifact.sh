@@ -83,4 +83,34 @@ while IFS= read -r entrypoint; do
   fi
 done <<< "$ENTRYPOINT_CLASSES"
 
+
+python3 - <<'PYCODE' "$ARTIFACT_PATH"
+import re
+import sys
+import zipfile
+
+artifact = sys.argv[1]
+# Named Yarn classes use package paths like net/minecraft/text/Text.
+# Intermediary runtime classes are typically net/minecraft/class_<id>.
+named_minecraft_pattern = re.compile(rb"net/minecraft/(?!class_)[a-z0-9_]+/[A-Z][A-Za-z0-9_$]*")
+
+violations = []
+with zipfile.ZipFile(artifact) as zf:
+    for name in zf.namelist():
+        if not name.startswith("com/yourname/gtstracker/") or not name.endswith('.class'):
+            continue
+        data = zf.read(name)
+        if named_minecraft_pattern.search(data):
+            violations.append(name)
+
+if violations:
+    sample = ', '.join(violations[:5])
+    print(
+        "Detected named-mapping Minecraft class references in release artifact classes "
+        f"(sample: {sample}). This usually means a dev jar was selected or remapping failed.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PYCODE
+
 echo "Release artifact checks passed: $ARTIFACT_PATH (${ARTIFACT_SIZE} bytes)"

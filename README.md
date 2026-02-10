@@ -84,7 +84,7 @@ Automated checks currently pass:
 
 - `build/devlibs/*-dev.jar` is the **development jar** (readable names/unmapped for production) and is primarily for local dev/runtime tooling.
 - `build/libs/*.jar` is the **release/remapped jar** expected for real client deployment.
-- In CI, if the remapped jar is invalid/missing, the workflow promotes a valid `*-dev.jar` into `build/libs/*.jar` as a fallback so uploads still contain runtime classes/resources.
+- CI refuses to publish when remapping fails. `*-dev.jar` is never promoted or published as a release artifact.
 
 #### Exact release command
 
@@ -97,7 +97,7 @@ Local release build:
 CI release build command (from `.github/workflows/build-jar.yml`):
 
 ```bash
-./gradlew clean build -x test
+./gradlew clean build
 ```
 
 Expected outputs after a successful build:
@@ -126,8 +126,8 @@ At minimum, confirm entries like:
   - Fix: rerun `./gradlew clean build`, then compare `build/libs` vs `build/devlibs` sizes and inspect both with `jar tf`.
 - **Entrypoint crash on startup:** release jar may be missing required classes/resources.
   - Fix: inspect `run/logs/latest.log`, then validate jar contains `GTSTrackerMod.class` + `fabric.mod.json`; rebuild and retest in a clean profile.
-- **Unremapped classes in release artifact:** `build/libs/*.jar` may be invalid while `*-dev.jar` has classes.
-  - Fix: run `./gradlew remapJar build`, and if CI still detects bad remap output, use the promoted fallback jar while investigating Loom/remap environment issues.
+- **Unremapped classes in release artifact:** remapping failed and the build should fail before publication.
+  - Fix: run `./gradlew clean remapJar verifyReleaseJar`, inspect Loom/remap logs, and do not publish until remap output is valid.
 
 #### CI workflow and fast diagnostics
 
@@ -165,7 +165,7 @@ Release packaging policy:
 
 1. `jar` builds the canonical dev artifact (`build/devlibs/...-dev.jar`) with compiled classes/resources.
 2. `remapJar` still runs and is preferred when it contains required runtime entries.
-3. `prepareReleaseJar` verifies remap output and falls back to the dev jar if remap output is stripped/missing runtime entries.
+3. `prepareReleaseJar` verifies remap output and fails the build if runtime entries are missing.
 4. `verifyReleaseJar` enforces final release-jar validity (`fabric.mod.json` + `GTSTrackerMod.class`) so no build step can silently strip/overwrite deployable output.
 
 ## Runtime output locations
