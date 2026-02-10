@@ -3,6 +3,7 @@ package com.yourname.gtstracker;
 import com.yourname.gtstracker.config.ConfigManager;
 import com.yourname.gtstracker.config.ConfigModel;
 import com.yourname.gtstracker.chat.GTSChatMonitor;
+import com.yourname.gtstracker.compat.CompatibilityReporter;
 import com.yourname.gtstracker.database.DatabaseManager;
 import com.yourname.gtstracker.ingest.ListingIngestionService;
 import com.yourname.gtstracker.ui.CommandHandler;
@@ -40,16 +41,22 @@ public final class GTSTrackerMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         instance = this;
-        this.config = ConfigManager.load();
+        try {
+            this.config = ConfigManager.load();
 
-        this.databaseManager = new DatabaseManager();
-        this.databaseManager.initialize();
+            this.databaseManager = new DatabaseManager();
+            this.databaseManager.initialize();
 
-        this.ingestionService = new ListingIngestionService(this.databaseManager);
-        this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
-        this.chatMonitor.register();
+            this.ingestionService = new ListingIngestionService(this.databaseManager);
+            this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
+            this.chatMonitor.register();
 
-        CommandHandler.register();
-        LOGGER.info("Cobblemon GTS Tracker initialized.");
+            CompatibilityReporter.logStartupCompatibility();
+            CommandHandler.register();
+            LOGGER.info("Cobblemon GTS Tracker initialized.");
+        } catch (RuntimeException e) {
+            LOGGER.error("GTSTracker failed to initialize. See stack trace for details.", e);
+            throw e;
+        }
     }
 }

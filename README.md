@@ -69,17 +69,19 @@ Run:
 ./gradlew clean build
 ```
 
-Then use this artifact for immediate testing:
+Use this artifact for immediate testing/deployment:
 
-- `build/libs/gtstracker-0.1.0-test.jar` (built from the dev jar and contains classes/resources)
+- `build/libs/gtstracker-0.1.0.jar` (release path; build now auto-falls back to the dev jar when remap output is unexpectedly empty).
 
-> Note: `build/libs/gtstracker-0.1.0.jar` is the remapped release jar and is currently manifest-only in this environment, so use the `-test.jar` for now.
+Optional debug artifact:
 
-### What is still needed for a release jar
+- `build/libs/gtstracker-0.1.0-test.jar`
 
-1. Fix `remapJar` output so the published release jar contains classes/resources.
-2. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions above.
-3. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
+### What is still needed for final live verification
+
+1. Verify in a real game client with display support (`./gradlew runClient`) using the pinned stack versions above.
+2. Confirm `/gtstracker status` initializes DB and writes expected runtime files (`run/logs/latest.log`, `run/config/gtstracker/gtstracker.db`).
+3. Run `/gtstracker gui` to verify GUI opening/rendering on your target modpack profile.
 4. Re-run `./gradlew clean build` and verify final artifact contents with: `jar tf build/libs/<jar-name>.jar`.
 
 ## Runtime output locations

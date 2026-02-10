@@ -45,12 +45,9 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-
 tasks.test {
     useJUnitPlatform()
 }
-
-
 
 tasks.register("testJar", Copy) {
     dependsOn tasks.named("jar")
@@ -59,6 +56,33 @@ tasks.register("testJar", Copy) {
     rename { "${base.archivesName.get()}-${project.version}-test.jar" }
 }
 
+def releaseJar = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+
+tasks.register("ensureReleaseJarUsable") {
+    dependsOn tasks.named("remapJar")
+
+    doLast {
+        File remapped = releaseJar.get().asFile
+        int entries = 0
+
+        if (remapped.exists()) {
+            new java.util.zip.ZipFile(remapped).withCloseable { zip ->
+                entries = zip.entries().findAll { !it.isDirectory() }.size()
+            }
+        }
+
+        if (entries <= 1) {
+            logger.warn("remapJar output appears empty ({} entries). Replacing release artifact with dev jar fallback.", entries)
+            copy {
+                from(tasks.named("jar", Jar).flatMap { it.archiveFile })
+                into(remapped.parentFile)
+                rename { remapped.name }
+            }
+        }
+    }
+}
+
 tasks.named("build") {
     dependsOn tasks.named("testJar")
+    finalizedBy tasks.named("ensureReleaseJarUsable")
 }
