@@ -40,6 +40,10 @@ public final class GTSTrackerMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        LOGGER.info("Starting Cobblemon GTS Tracker initialization.");
+
+        try {
+            instance = this;
         instance = this;
         try {
             this.config = ConfigManager.load();
@@ -51,6 +55,11 @@ public final class GTSTrackerMod implements ClientModInitializer {
             this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
             this.chatMonitor.register();
 
+            CommandHandler.register();
+            LOGGER.info("Cobblemon GTS Tracker initialized successfully.");
+        } catch (Exception exception) {
+            LOGGER.error("Failed to initialize Cobblemon GTS Tracker. The mod may not function correctly.", exception);
+            throw exception;
             CompatibilityReporter.logStartupCompatibility();
             CommandHandler.register();
             LOGGER.info("Cobblemon GTS Tracker initialized.");
