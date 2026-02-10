@@ -8,6 +8,7 @@ import com.yourname.gtstracker.compat.CompatibilityReporter;
 import com.yourname.gtstracker.data.ListingSnapshot;
 import com.yourname.gtstracker.data.ListingSnapshotCache;
 import com.yourname.gtstracker.database.models.ListingData;
+import com.yourname.gtstracker.ui.bloomberg.BloombergGUI;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
@@ -35,6 +36,13 @@ public final class CommandHandler {
             dispatcher.register(buildRootCommand("gts"));
             dispatcher.register(buildRootCommand("gtstracker"));
         });
+    }
+
+    private static synchronized ListingSnapshotCache getOrCreateSnapshotCache() {
+        if (snapshotCache == null || snapshotCache.isClosed()) {
+            snapshotCache = new ListingSnapshotCache(ListingSnapshot::empty);
+        }
+        return snapshotCache;
     }
 
     private static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String rootName) {
@@ -80,7 +88,7 @@ public final class CommandHandler {
                 .executes(context -> {
                     try {
                         MinecraftClient client = MinecraftClient.getInstance();
-                        client.setScreen(new com.yourname.gtstracker.ui.bloomberg.BloombergGUI(SNAPSHOT_CACHE));
+                        client.setScreen(new BloombergGUI(getOrCreateSnapshotCache(), true));
                         LOGGER.info("Opened Bloomberg GUI via /{} gui", rootName);
                     } catch (RuntimeException e) {
                         LOGGER.error("Failed to open Bloomberg GUI via /{} gui", rootName, e);
@@ -92,7 +100,6 @@ public final class CommandHandler {
                         }
                         return 0;
                     }
-                    return Command.SINGLE_SUCCESS;
                 }));
     }
 }

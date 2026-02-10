@@ -20,14 +20,19 @@ public final class GtsGuiCommand {
     }
 
     public static LiteralArgumentBuilder<FabricClientCommandSource> create(ListingSnapshotProvider snapshotProvider) {
-        snapshotCache = new ListingSnapshotCache(snapshotProvider);
-
         return literal("gts")
             .then(literal("gui")
                 .executes(context -> {
                     MinecraftClient client = MinecraftClient.getInstance();
-                    client.setScreen(new BloombergGUI(snapshotCache));
+                    client.setScreen(new BloombergGUI(getOrCreateCache(snapshotProvider), true));
                     return Command.SINGLE_SUCCESS;
                 }));
+    }
+
+    private static synchronized ListingSnapshotCache getOrCreateCache(ListingSnapshotProvider snapshotProvider) {
+        if (snapshotCache == null || snapshotCache.isClosed()) {
+            snapshotCache = new ListingSnapshotCache(snapshotProvider);
+        }
+        return snapshotCache;
     }
 }
