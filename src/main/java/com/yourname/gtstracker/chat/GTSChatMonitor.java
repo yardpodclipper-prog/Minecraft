@@ -39,9 +39,12 @@ public class GTSChatMonitor {
         }
 
         String plainMessage = message.getString();
-        ingestionService.ingestChatMessage(plainMessage);
-
-        LOGGER.debug("GTS chat monitor ingested incoming message: {}", plainMessage);
+        try {
+            ingestionService.ingestChatMessage(plainMessage);
+            LOGGER.debug("GTS chat monitor ingested incoming message: {}", plainMessage);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Failed to ingest incoming GTS-like message: {}", plainMessage, ex);
+        }
 
         if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
             MinecraftClient client = MinecraftClient.getInstance();
