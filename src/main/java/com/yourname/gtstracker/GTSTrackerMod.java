@@ -1,25 +1,5 @@
 package com.yourname.gtstracker;
 
-import net.fabricmc.api.ModInitializer;
-
-/**
- * Fabric entrypoint for GTS Tracker.
- */
-public final class GTSTrackerMod implements ModInitializer {
-    public static final String MOD_ID = "gtstracker";
-
-    private GTSTrackerBootstrap bootstrap;
-
-    @Override
-    public void onInitialize() {
-        bootstrap = GTSTrackerBootstrap.createDefault();
-        bootstrap.start();
-
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (bootstrap != null) {
-                bootstrap.stop();
-            }
-        }, MOD_ID + "-shutdown"));
 import com.yourname.gtstracker.config.ConfigManager;
 import com.yourname.gtstracker.config.ConfigModel;
 import com.yourname.gtstracker.database.DatabaseManager;
@@ -59,8 +39,10 @@ public final class GTSTrackerMod implements ClientModInitializer {
     public void onInitializeClient() {
         instance = this;
         this.config = ConfigManager.load();
+
         this.databaseManager = new DatabaseManager();
         this.databaseManager.initialize();
+
         this.ingestionService = new ListingIngestionService(this.databaseManager);
 
         CommandHandler.register();

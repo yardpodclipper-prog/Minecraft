@@ -13,4 +13,12 @@ public class ConfigModel {
 
     public boolean showOverlayOnGTS = true;
     public boolean bloombergTheme = true;
+
+    public boolean isChatMonitoringEnabled() {
+        return chatMonitoringEnabled;
+    }
+
+    public void setChatMonitoringEnabled(boolean chatMonitoringEnabled) {
+        this.chatMonitoringEnabled = chatMonitoringEnabled;
+    }
 }
