@@ -83,4 +83,36 @@ while IFS= read -r entrypoint; do
   fi
 done <<< "$ENTRYPOINT_CLASSES"
 
+TMP_DIR=$(mktemp -d)
+cleanup() {
+  rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
+
+mapfile -t TRACKER_CLASSES < <(jar tf "$ARTIFACT_PATH" | grep '^com/yourname/gtstracker/.*\.class$' || true)
+
+if (( ${#TRACKER_CLASSES[@]} == 0 )); then
+  echo "No classes found under com/yourname/gtstracker in artifact: $ARTIFACT_PATH"
+  exit 1
+fi
+
+LEAKED_MAPPINGS=()
+for class_file in "${TRACKER_CLASSES[@]}"; do
+  class_output_path="$TMP_DIR/$class_file"
+  mkdir -p "$(dirname "$class_output_path")"
+  unzip -p "$ARTIFACT_PATH" "$class_file" > "$class_output_path"
+
+  if javap -verbose "$class_output_path" | grep -q 'net/minecraft/'; then
+    LEAKED_MAPPINGS+=("$class_file")
+  fi
+done
+
+if (( ${#LEAKED_MAPPINGS[@]} > 0 )); then
+  echo "Named-mapping leakage detected in release artifact bytecode."
+  echo "Likely cause: dev jar selected / remap missing."
+  echo "Classes containing net/minecraft/ symbols:"
+  printf '  - %s\n' "${LEAKED_MAPPINGS[@]}"
+  exit 1
+fi
+
 echo "Release artifact checks passed: $ARTIFACT_PATH (${ARTIFACT_SIZE} bytes)"
