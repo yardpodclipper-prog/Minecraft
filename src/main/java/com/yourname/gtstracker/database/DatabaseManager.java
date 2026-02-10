@@ -19,16 +19,23 @@ import java.util.Locale;
 public class DatabaseManager {
     private static final String DB_FILE = "gtstracker.db";
 
+    private final String jdbcUrlOverride;
     private Connection connection;
+
+    public DatabaseManager() {
+        this(null);
+    }
+
+    public DatabaseManager(String jdbcUrlOverride) {
+        this.jdbcUrlOverride = jdbcUrlOverride;
+    }
 
     public void initialize() {
         try {
             Class.forName("org.sqlite.JDBC");
-            Path dbDir = FabricLoader.getInstance().getGameDir().resolve("config").resolve("gtstracker");
-            Files.createDirectories(dbDir);
-            Path dbPath = dbDir.resolve(DB_FILE);
+            String jdbcUrl = resolveJdbcUrl();
 
-            connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+            connection = DriverManager.getConnection(jdbcUrl);
             connection.setAutoCommit(true);
 
             try (Statement stmt = connection.createStatement()) {
@@ -37,7 +44,7 @@ public class DatabaseManager {
             }
 
             createSchema();
-            GTSTrackerMod.LOGGER.info("Database initialized at {}", dbPath.toAbsolutePath());
+            GTSTrackerMod.LOGGER.info("Database initialized at {}", jdbcUrl);
         } catch (Exception e) {
             GTSTrackerMod.LOGGER.error("Failed to initialize SQLite database.", e);
         }
@@ -176,6 +183,17 @@ public class DatabaseManager {
 
     private String toDbSource(DataSource source) {
         return source == null ? "chat" : source.name().toLowerCase(Locale.ROOT);
+    }
+
+    private String resolveJdbcUrl() throws Exception {
+        if (jdbcUrlOverride != null && !jdbcUrlOverride.isBlank()) {
+            return jdbcUrlOverride;
+        }
+
+        Path dbDir = FabricLoader.getInstance().getGameDir().resolve("config").resolve("gtstracker");
+        Files.createDirectories(dbDir);
+        Path dbPath = dbDir.resolve(DB_FILE);
+        return "jdbc:sqlite:" + dbPath.toAbsolutePath();
     }
 
     private void createSchema() throws SQLException {

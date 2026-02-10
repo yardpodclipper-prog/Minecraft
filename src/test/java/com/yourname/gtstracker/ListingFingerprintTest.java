@@ -1,65 +1,46 @@
 package com.yourname.gtstracker;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import org.junit.jupiter.api.BeforeAll;
+import com.yourname.gtstracker.database.models.PokemonListing;
+import com.yourname.gtstracker.util.ListingFingerprint;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class ListingFingerprintTest {
 
-    private static Class<?> fingerprintClass;
-    private static Method fingerprintMethod;
+    @Test
+    void stableIdWithinSameMinuteForSameListing() {
+        PokemonListing listing = new PokemonListing();
+        listing.setSeller("Ash");
+        listing.setSpecies("Gengar");
+        listing.setShiny(true);
+        listing.setLevel(55);
+        listing.setPrice(250000);
 
-    @BeforeAll
-    static void setup() throws Exception {
-        fingerprintClass = Class.forName("com.yourname.gtstracker.ListingFingerprint");
-        fingerprintMethod = Arrays.stream(fingerprintClass.getDeclaredMethods())
-                .filter(m -> m.getName().toLowerCase(Locale.ROOT).matches(".*(fingerprint|id|hash).*$"))
-                .filter(m -> m.getParameterCount() == 1)
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No fingerprint/id/hash single-arg method found"));
-        fingerprintMethod.setAccessible(true);
+        String idA = ListingFingerprint.build(listing, Instant.parse("2024-01-01T00:00:01Z"));
+        String idB = ListingFingerprint.build(listing, Instant.parse("2024-01-01T00:00:59Z"));
+
+        assertEquals(idA, idB);
     }
 
     @Test
-    void stableIdsForSemanticallySameNormalizedInput() throws Exception {
-        Map<String, Object> listingA = baseListing();
-        Map<String, Object> listingB = baseListing();
+    void differentIdWhenCoreAttributesChange() {
+        PokemonListing listingA = new PokemonListing();
+        listingA.setSeller("Ash");
+        listingA.setSpecies("Gengar");
+        listingA.setLevel(55);
+        listingA.setPrice(250000);
 
-        listingB.put("species", "   gengar  ");
-        listingB.put("seller", "ash");
+        PokemonListing listingB = new PokemonListing();
+        listingB.setSeller("Ash");
+        listingB.setSpecies("Gengar");
+        listingB.setLevel(55);
+        listingB.setPrice(275000);
 
-        String idA = String.valueOf(fingerprintMethod.invoke(null, listingA));
-        String idB = String.valueOf(fingerprintMethod.invoke(null, listingB));
-
-        assertEquals(idA, idB, "Fingerprint should remain stable across normalization-only differences");
-    }
-
-    @Test
-    void differentIdsWhenKeyAttributesChange() throws Exception {
-        Map<String, Object> listingA = baseListing();
-        Map<String, Object> listingB = baseListing();
-        listingB.put("price", 275000);
-
-        String idA = String.valueOf(fingerprintMethod.invoke(null, listingA));
-        String idB = String.valueOf(fingerprintMethod.invoke(null, listingB));
-
-        assertNotEquals(idA, idB, "Changing key attributes should produce a distinct fingerprint");
-    }
-
-    private Map<String, Object> baseListing() {
-        Map<String, Object> listing = new LinkedHashMap<>();
-        listing.put("listingType", "pokemon");
-        listing.put("species", "Gengar");
-        listing.put("level", 55);
-        listing.put("price", 250000);
-        listing.put("seller", "Ash");
-        listing.put("iv", "31/31/31/31/31/31");
-        return listing;
+        Instant seenAt = Instant.parse("2024-01-01T00:00:30Z");
+        assertNotEquals(ListingFingerprint.build(listingA, seenAt), ListingFingerprint.build(listingB, seenAt));
     }
 }
