@@ -41,12 +41,6 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
-tasks.named("remapJar", net.fabricmc.loom.task.RemapJarTask) {
-    dependsOn tasks.named("jar")
-    inputFile.set(tasks.named("jar", Jar).flatMap { it.archiveFile })
-    archiveClassifier.set("")
-}
-
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
@@ -56,20 +50,29 @@ tasks.test {
     useJUnitPlatform()
 }
 
+def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+
+tasks.register("prepareReleaseJar", Copy) {
+    dependsOn tasks.named("jar")
+    from(tasks.named("jar", Jar).flatMap { it.archiveFile })
+    into(layout.buildDirectory.dir("libs"))
+    rename { "${base.archivesName.get()}-${project.version}.jar" }
+}
+
 tasks.register("verifyReleaseJar") {
-    dependsOn tasks.named("remapJar")
+    dependsOn tasks.named("prepareReleaseJar")
 
     doLast {
-        File remapped = tasks.named("remapJar", net.fabricmc.loom.task.RemapJarTask).get().archiveFile.get().asFile
-        if (!remapped.exists()) {
-            throw new GradleException("Release jar was not produced by remapJar: ${remapped}")
+        File releaseJar = releaseJarPath.get().asFile
+        if (!releaseJar.exists()) {
+            throw new GradleException("Release jar was not produced: ${releaseJar}")
         }
 
         int fileEntries = 0
         boolean hasModMetadata = false
         boolean hasEntrypointClass = false
 
-        new java.util.zip.ZipFile(remapped).withCloseable { zip ->
+        new java.util.zip.ZipFile(releaseJar).withCloseable { zip ->
             def entries = zip.entries().toList()
             fileEntries = entries.findAll { !it.isDirectory() }.size()
             hasModMetadata = entries.any { it.name == 'fabric.mod.json' }
@@ -78,7 +81,7 @@ tasks.register("verifyReleaseJar") {
 
         if (fileEntries <= 1 || !hasModMetadata || !hasEntrypointClass) {
             throw new GradleException(
-                "Invalid remapJar release artifact at ${remapped} (files=${fileEntries}, fabric.mod.json=${hasModMetadata}, entrypoint=${hasEntrypointClass})."
+                "Invalid release artifact at ${releaseJar} (files=${fileEntries}, fabric.mod.json=${hasModMetadata}, entrypoint=${hasEntrypointClass})."
             )
         }
     }
