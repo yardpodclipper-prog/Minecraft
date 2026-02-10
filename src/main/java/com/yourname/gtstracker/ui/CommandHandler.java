@@ -8,6 +8,7 @@ import com.yourname.gtstracker.compat.CompatibilityReporter;
 import com.yourname.gtstracker.data.ListingSnapshot;
 import com.yourname.gtstracker.data.ListingSnapshotCache;
 import com.yourname.gtstracker.database.models.ListingData;
+import com.yourname.gtstracker.ui.bloomberg.BloombergGUI;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
@@ -22,7 +23,7 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.lit
 
 public final class CommandHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandHandler.class);
-    private static final ListingSnapshotCache SNAPSHOT_CACHE = new ListingSnapshotCache(ListingSnapshot::empty);
+    private static ListingSnapshotCache snapshotCache;
 
     private CommandHandler() {
     }
@@ -32,6 +33,13 @@ public final class CommandHandler {
             dispatcher.register(buildRootCommand("gts"));
             dispatcher.register(buildRootCommand("gtstracker"));
         });
+    }
+
+    private static synchronized ListingSnapshotCache getOrCreateSnapshotCache() {
+        if (snapshotCache == null || snapshotCache.isClosed()) {
+            snapshotCache = new ListingSnapshotCache(ListingSnapshot::empty);
+        }
+        return snapshotCache;
     }
 
     private static LiteralArgumentBuilder<FabricClientCommandSource> buildRootCommand(String rootName) {
@@ -69,9 +77,10 @@ public final class CommandHandler {
                 .executes(context -> {
                     try {
                         MinecraftClient client = MinecraftClient.getInstance();
-                        client.setScreen(new com.yourname.gtstracker.ui.bloomberg.BloombergGUI(SNAPSHOT_CACHE));
+                        client.setScreen(new BloombergGUI(getOrCreateSnapshotCache(), true));
                         LOGGER.info("Opened Bloomberg GUI via /{} gui", rootName);
-                    } catch (Exception exception) {
+                        return Command.SINGLE_SUCCESS;
+                    } catch (RuntimeException exception) {
                         LOGGER.error("Failed to open Bloomberg GUI via /{} gui", rootName, exception);
                         if (context.getSource().getPlayer() != null) {
                             context.getSource().getPlayer().sendMessage(
@@ -80,21 +89,7 @@ public final class CommandHandler {
                             );
                         }
                         return 0;
-                    MinecraftClient client = MinecraftClient.getInstance();
-                    try {
-                        client.setScreen(new com.yourname.gtstracker.ui.bloomberg.BloombergGUI(SNAPSHOT_CACHE));
-                    } catch (RuntimeException e) {
-                        LOGGER.error("Failed to open Bloomberg GUI.", e);
-                        if (context.getSource().getPlayer() != null) {
-                            context.getSource().getPlayer().sendMessage(Text.literal("GTSTracker GUI failed to open. Check latest.log."), false);
-                        GTSTrackerMod.LOGGER.info("Opened Bloomberg GUI successfully.");
-                    } catch (RuntimeException e) {
-                        GTSTrackerMod.LOGGER.error("Failed to open Bloomberg GUI.", e);
-                        if (context.getSource().getPlayer() != null) {
-                            context.getSource().getPlayer().sendMessage(Text.literal("[GTSTracker] Failed to open GUI; check latest.log"), false);
-                        }
                     }
-                    return Command.SINGLE_SUCCESS;
                 }));
     }
 }
