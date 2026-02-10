@@ -27,18 +27,45 @@ jobs:
           cache: gradle
 
       - name: Build release jar (skip tests)
-        run: ./gradlew clean prepareReleaseJar verifyReleaseJar -x test
+        run: ./gradlew clean build -x test
+
+      - name: Resolve remapped release jar
+        id: release_jar
+        run: |
+          CANDIDATE_LIST=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-dev.jar' ! -name '*-sources.jar' -printf '%s %p\n' | sort -nr)
+          if [ -z "$CANDIDATE_LIST" ]; then
+            echo "No remapped release jar found in build/libs"
+            exit 1
+          fi
+
+          JAR_PATH=$(printf '%s\n' "$CANDIDATE_LIST" | head -n 1 | cut -d' ' -f2-)
+          JAR_SIZE=$(stat -c%s "$JAR_PATH")
+
+          if [ "$JAR_SIZE" -lt 10240 ]; then
+            echo "Selected jar is unexpectedly small (${JAR_SIZE} bytes): $JAR_PATH"
+            echo "Available candidates:"
+            printf '%s\n' "$CANDIDATE_LIST"
+            exit 1
+          fi
+
+          if ! jar tf "$JAR_PATH" | grep -q '^fabric.mod.json$'; then
+            echo "Selected jar does not contain fabric.mod.json: $JAR_PATH"
+            exit 1
+          fi
+
+          echo "Using release jar: $JAR_PATH (${JAR_SIZE} bytes)"
+          echo "path=$JAR_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
         with:
           name: gtstracker-jar
-          path: build/libs/gtstracker-0.1.0.jar
+          path: ${{ steps.release_jar.outputs.path }}
           if-no-files-found: error
 
       - name: Publish GitHub release asset (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/gtstracker-0.1.0.jar
+          files: ${{ steps.release_jar.outputs.path }}
           generate_release_notes: true
