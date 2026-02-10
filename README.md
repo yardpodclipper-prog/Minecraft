@@ -82,9 +82,8 @@ Automated checks currently pass:
 
 #### Artifact differences
 
-- `build/devlibs/*-dev.jar` is the **development jar** (readable names/unmapped for production) and is primarily for local dev/runtime tooling.
-- `build/libs/*.jar` is the **release/remapped jar** expected for real client deployment.
-- In CI, if the remapped jar is invalid/missing, the workflow promotes a valid `*-dev.jar` into `build/libs/*.jar` as a fallback so uploads still contain runtime classes/resources.
+- `build/devlibs/*-dev.jar` is for **local development only**.
+- `build/libs/*.jar` is for **remapped release artifacts only**.
 
 #### Exact release command
 
@@ -127,7 +126,7 @@ At minimum, confirm entries like:
 - **Entrypoint crash on startup:** release jar may be missing required classes/resources.
   - Fix: inspect `run/logs/latest.log`, then validate jar contains `GTSTrackerMod.class` + `fabric.mod.json`; rebuild and retest in a clean profile.
 - **Unremapped classes in release artifact:** `build/libs/*.jar` may be invalid while `*-dev.jar` has classes.
-  - Fix: run `./gradlew remapJar build`, and if CI still detects bad remap output, use the promoted fallback jar while investigating Loom/remap environment issues.
+  - Fix: run `./gradlew remapJar build` and resolve remapping errors until a valid `build/libs/*.jar` is produced.
 
 #### CI workflow and fast diagnostics
 
@@ -163,10 +162,9 @@ Runtime dependency packaging is intentionally split into **embedded mod dependen
 
 Release packaging policy:
 
-1. `jar` builds the canonical dev artifact (`build/devlibs/...-dev.jar`) with compiled classes/resources.
-2. `remapJar` still runs and is preferred when it contains required runtime entries.
-3. `prepareReleaseJar` verifies remap output and falls back to the dev jar if remap output is stripped/missing runtime entries.
-4. `verifyReleaseJar` enforces final release-jar validity (`fabric.mod.json` + `GTSTrackerMod.class`) so no build step can silently strip/overwrite deployable output.
+1. `jar` builds the canonical dev artifact (`build/devlibs/...-dev.jar`) for local development.
+2. `remapJar` produces the release artifact in `build/libs/*.jar` for deployment.
+3. `verifyReleaseJar` enforces final release-jar validity (`fabric.mod.json` + `GTSTrackerMod.class`) so no build step can silently strip/overwrite deployable output.
 
 ## Runtime output locations
 
@@ -187,6 +185,7 @@ If startup or GUI fails in production, GTSTracker now emits explicit error logs 
 - [ ] Loads in CobbleGalaxy modstack without command/keybinding conflicts
 - [ ] `/gtstracker status` works and DB initializes
 - [ ] `/gtstracker gui` opens the Bloomberg screen without exceptions
+- [ ] Artifact remap validation passed
 - [ ] No GTSTracker initialization/GUI error entries in `latest.log`
 - [ ] No startup exceptions in `latest.log`
 
