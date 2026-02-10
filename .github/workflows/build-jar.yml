@@ -27,7 +27,7 @@ jobs:
           cache: gradle
 
       - name: Build release jar (skip tests)
-        run: ./gradlew clean prepareReleaseJar verifyReleaseJar -x test
+        run: ./gradlew clean remapJar verifyReleaseJar -x test
 
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
