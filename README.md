@@ -1,7 +1,8 @@
-# Minecraft Mod Development
+# Cobblemon GTS Tracker
 
-## Requirements
+Client-side Fabric mod that parses GTS listings from chat and stores snapshots locally for price/disappearance analysis.
 
+## Compatibility
 - **JDK:** 21
 - **Supported Minecraft version:** 1.21.1
 
@@ -15,16 +16,31 @@
 
 ## Commands
 
+The mod registers both namespaced and legacy command roots:
+
+- `/gtstracker status`
+- `/gtstracker ingesttest <message>`
+- `/gtstracker gui`
+- `/gts ...` (legacy alias)
+
+## Build and test
+
 ### Build
 
 ```bash
 ./gradlew build
 ```
 
-### Tests
+### Java tests
 
 ```bash
 ./gradlew test
+```
+
+### Python tests
+
+```bash
+pytest -q
 ```
 
 ### Run in development
@@ -33,11 +49,30 @@
 ./gradlew runClient
 ```
 
-If your loader uses a different run task, use its client run equivalent (for example, a loader-specific `runClient` replacement).
-
 ## Runtime output locations
 
-When running from Gradle, runtime artifacts are typically written under the `run/` directory:
+When running from Gradle, runtime artifacts are typically written under `run/`:
+
+- Logs: `run/logs/latest.log`
+- Database: `run/config/gtstracker/gtstracker.db`
+
+## Release checklist for stable modpack usage
+
+- [ ] Jar built from clean repo (`./gradlew clean build`)
+- [ ] Loads in a clean client profile with only Fabric Loader + Fabric API + this mod
+- [ ] Loads in CobbleGalaxy modstack without command/keybinding conflicts
+- [ ] `/gtstracker status` works and DB initializes
+- [ ] No startup exceptions in `latest.log`
 
 - **Logs:** `run/logs/latest.log` (and related files in `run/logs/`)
 - **DB files:** any runtime-created database file (for example `*.db`) will appear in `run/` unless configured otherwise in code.
+
+## Known-good test profile versions
+
+- **Minecraft:** `1.21.1`
+- **Fabric Loader:** `0.16.9`
+- **Fabric API:** `0.116.7+1.21.1`
+- **Cobblemon GTS Tracker:** `0.1.0`
+- **Client commands:** `/gts ...` and `/gtstracker ...` are both registered and point to the same handlers.
+
+> Verification note: in this headless CI/container environment, client bootstrap reaches mod initialization (including `Cobblemon GTS Tracker initialized.`) but crashes before interactive command entry because no GLFW display is available.
