@@ -6,7 +6,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,28 +18,29 @@ public class PokemonListingDAO extends ListingDAO {
 
     public List<PriceSample> getPokemonPriceSamples(String species, boolean shinyOnly, Integer minIv, Instant cutoff) throws SQLException {
         StringBuilder sql = new StringBuilder("""
-            SELECT price, created_at
-            FROM listings
-            WHERE listing_type = 'POKEMON'
-              AND status = 'ACTIVE'
-              AND pokemon_species = ?
-              AND created_at >= ?
+            SELECT l.price, l.last_seen
+            FROM listings l
+            JOIN pokemon_listings p ON p.listing_id = l.id
+            WHERE l.listing_type = 'POKEMON'
+              AND l.status = 'active'
+              AND p.species = ?
+              AND l.last_seen >= ?
             """);
 
         if (shinyOnly) {
-            sql.append(" AND is_shiny = TRUE");
+            sql.append(" AND p.is_shiny = 1");
         }
         if (minIv != null) {
-            sql.append(" AND iv_total >= ?");
+            sql.append(" AND p.iv_total >= ?");
         }
-        sql.append(" ORDER BY created_at DESC");
+        sql.append(" ORDER BY l.last_seen DESC");
 
         List<PriceSample> samples = new ArrayList<>();
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(sql.toString())) {
             int index = 1;
             ps.setString(index++, species);
-            ps.setTimestamp(index++, Timestamp.from(cutoff));
+            ps.setLong(index++, cutoff.toEpochMilli());
             if (minIv != null) {
                 ps.setInt(index, minIv);
             }
@@ -49,7 +49,7 @@ public class PokemonListingDAO extends ListingDAO {
                 while (rs.next()) {
                     samples.add(new PriceSample(
                         rs.getBigDecimal("price"),
-                        toInstant(rs.getTimestamp("created_at"))
+                        toInstant(rs.getLong("last_seen"))
                     ));
                 }
             }

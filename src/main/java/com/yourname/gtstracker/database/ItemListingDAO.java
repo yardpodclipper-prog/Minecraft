@@ -6,7 +6,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,26 +18,27 @@ public class ItemListingDAO extends ListingDAO {
 
     public List<PriceSample> getItemPriceSamples(String itemName, Instant cutoff) throws SQLException {
         String sql = """
-            SELECT price, created_at
-            FROM listings
-            WHERE listing_type = 'ITEM'
-              AND status = 'ACTIVE'
-              AND item_name = ?
-              AND created_at >= ?
-            ORDER BY created_at DESC
+            SELECT l.price, l.last_seen
+            FROM listings l
+            JOIN item_listings i ON i.listing_id = l.id
+            WHERE l.listing_type = 'ITEM'
+              AND l.status = 'active'
+              AND i.item_name = ?
+              AND l.last_seen >= ?
+            ORDER BY l.last_seen DESC
             """;
 
         List<PriceSample> samples = new ArrayList<>();
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, itemName);
-            ps.setTimestamp(2, Timestamp.from(cutoff));
+            ps.setLong(2, cutoff.toEpochMilli());
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     samples.add(new PriceSample(
                         rs.getBigDecimal("price"),
-                        toInstant(rs.getTimestamp("created_at"))
+                        toInstant(rs.getLong("last_seen"))
                     ));
                 }
             }
