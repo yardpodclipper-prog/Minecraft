@@ -51,10 +51,11 @@ tasks.test {
 }
 
 def releaseJarPath = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+def developmentJarPath = layout.buildDirectory.file("devlibs/${base.archivesName.get()}-${project.version}-dev.jar")
 
 tasks.register("prepareReleaseJar", Copy) {
     dependsOn tasks.named("jar")
-    from(tasks.named("jar", Jar).flatMap { it.archiveFile })
+    from(developmentJarPath)
     into(layout.buildDirectory.dir("libs"))
     rename { "${base.archivesName.get()}-${project.version}.jar" }
 }
@@ -85,10 +86,6 @@ tasks.register("verifyReleaseJar") {
             )
         }
     }
-}
-
-tasks.named("check") {
-    dependsOn tasks.named("verifyReleaseJar")
 }
 
 tasks.named("build") {

@@ -108,7 +108,7 @@ You should see classes/resources such as `com/yourname/gtstracker/GTSTrackerMod.
 4. Test in both a clean Fabric profile and the full CobbleGalaxy modpack profile to confirm compatibility.
 Use this artifact for deployment/testing:
 
-- `build/libs/gtstracker-0.1.0.jar` (remapped release jar)
+- `build/libs/gtstracker-0.1.0.jar` (release jar copied from the built dev artifact with classes/resources)
 
 Optional verification:
 
@@ -116,10 +116,10 @@ Optional verification:
 jar tf build/libs/gtstracker-0.1.0.jar | head
 ```
 
-The build now includes `verifyReleaseJar`, which validates that the release jar contains required runtime entries (`fabric.mod.json` and `GTSTrackerMod.class`) before `check` passes.
+The build now includes `verifyReleaseJar`, which validates that the release jar contains required runtime entries (`fabric.mod.json` and `GTSTrackerMod.class`) at the end of `build`.
 Use this artifact for immediate testing/deployment:
 
-- `build/libs/gtstracker-0.1.0.jar` (produced by Loom `remapJar`; build now fails if this artifact is missing/invalid).
+- `build/libs/gtstracker-0.1.0.jar` (produced by `prepareReleaseJar`; build now fails if this artifact is missing/invalid).
 
 Optional debug artifact:
 
