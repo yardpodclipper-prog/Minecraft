@@ -107,6 +107,35 @@ public class ListingDAO {
         return rows;
     }
 
+
+    public int getActiveListingsCount() throws SQLException {
+        String sql = "SELECT COUNT(*) AS c FROM listings WHERE status = 'active'";
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt("c") : 0;
+        }
+    }
+
+    public java.util.Optional<Instant> getMaxLastSeenForActiveListings() throws SQLException {
+        String sql = "SELECT MAX(last_seen) AS last_seen FROM listings WHERE status = 'active'";
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (!rs.next()) {
+                return java.util.Optional.empty();
+            }
+
+            long lastSeen = rs.getLong("last_seen");
+            if (rs.wasNull()) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(toInstant(lastSeen));
+        }
+    }
+
     /**
      * Hook for future status lifecycle logic.
      *

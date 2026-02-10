@@ -12,16 +12,58 @@ import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 public final class GTSTrackerMod implements ClientModInitializer {
     public static final String MOD_ID = "gtstracker";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private static GTSTrackerMod instance;
 
+    private final Supplier<ConfigModel> configLoader;
+    private final Supplier<DatabaseManager> databaseManagerFactory;
+    private final Function<DatabaseManager, ListingIngestionService> ingestionServiceFactory;
+    private final BiFunction<ListingIngestionService, ConfigModel, GTSChatMonitor> chatMonitorFactory;
+    private final Runnable compatibilityLogger;
+    private final Runnable commandRegistrar;
+    private final StartupLogger startupLogger;
+
     private ConfigModel config;
     private DatabaseManager databaseManager;
     private ListingIngestionService ingestionService;
     private GTSChatMonitor chatMonitor;
+
+    public GTSTrackerMod() {
+        this(
+            ConfigManager::load,
+            DatabaseManager::new,
+            ListingIngestionService::new,
+            GTSChatMonitor::new,
+            CompatibilityReporter::logStartupCompatibility,
+            CommandHandler::register,
+            new DefaultStartupLogger()
+        );
+    }
+
+    GTSTrackerMod(
+        Supplier<ConfigModel> configLoader,
+        Supplier<DatabaseManager> databaseManagerFactory,
+        Function<DatabaseManager, ListingIngestionService> ingestionServiceFactory,
+        BiFunction<ListingIngestionService, ConfigModel, GTSChatMonitor> chatMonitorFactory,
+        Runnable compatibilityLogger,
+        Runnable commandRegistrar,
+        StartupLogger startupLogger
+    ) {
+        this.configLoader = configLoader;
+        this.databaseManagerFactory = databaseManagerFactory;
+        this.ingestionServiceFactory = ingestionServiceFactory;
+        this.chatMonitorFactory = chatMonitorFactory;
+        this.compatibilityLogger = compatibilityLogger;
+        this.commandRegistrar = commandRegistrar;
+        this.startupLogger = startupLogger;
+    }
 
     public static GTSTrackerMod getInstance() {
         return instance;
@@ -47,11 +89,14 @@ public final class GTSTrackerMod implements ClientModInitializer {
         try {
             this.config = ConfigManager.load();
 
-            this.databaseManager = new DatabaseManager();
+            this.databaseManager = databaseManagerFactory.get();
             this.databaseManager.initialize();
+            if (this.databaseManager.getConnection() == null) {
+                throw new IllegalStateException("Database initialization did not produce a connection.");
+            }
 
-            this.ingestionService = new ListingIngestionService(this.databaseManager);
-            this.chatMonitor = new GTSChatMonitor(this.ingestionService, this.config);
+            this.ingestionService = ingestionServiceFactory.apply(this.databaseManager);
+            this.chatMonitor = chatMonitorFactory.apply(this.ingestionService, this.config);
             this.chatMonitor.register();
 
             CompatibilityReporter.logStartupCompatibility();

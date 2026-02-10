@@ -5,7 +5,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.yourname.gtstracker.GTSTrackerMod;
 import com.yourname.gtstracker.compat.CompatibilityReporter;
-import com.yourname.gtstracker.data.ListingSnapshot;
+import com.yourname.gtstracker.data.DatabaseListingSnapshotProvider;
 import com.yourname.gtstracker.data.ListingSnapshotCache;
 import com.yourname.gtstracker.database.models.ListingData;
 import com.yourname.gtstracker.ui.bloomberg.BloombergGUI;
@@ -37,7 +37,7 @@ public final class CommandHandler {
 
     private static synchronized ListingSnapshotCache getOrCreateSnapshotCache() {
         if (snapshotCache == null || snapshotCache.isClosed()) {
-            snapshotCache = new ListingSnapshotCache(ListingSnapshot::empty);
+            snapshotCache = new ListingSnapshotCache(new DatabaseListingSnapshotProvider(GTSTrackerMod.getInstance().getDatabaseManager()));
         }
         return snapshotCache;
     }
@@ -57,9 +57,17 @@ public final class CommandHandler {
             .then(literal("ingesttest")
                 .then(argument("message", StringArgumentType.greedyString())
                     .executes(context -> {
+                        GTSTrackerMod mod = GTSTrackerMod.getInstance();
+                        if (mod == null) {
+                            return handleServiceUnavailable(context.getSource(), "ingesttest", "GTSTrackerMod.instance");
+                        }
+                        if (mod.getIngestionService() == null) {
+                            return handleServiceUnavailable(context.getSource(), "ingesttest", "ListingIngestionService");
+                        }
+
                         if (context.getSource().getPlayer() != null) {
                             String raw = StringArgumentType.getString(context, "message");
-                            Optional<ListingData> listing = GTSTrackerMod.getInstance()
+                            Optional<ListingData> listing = mod
                                 .getIngestionService()
                                 .ingestChatMessage(raw);
 
@@ -75,6 +83,14 @@ public final class CommandHandler {
                     })))
             .then(literal("gui")
                 .executes(context -> {
+                    GTSTrackerMod mod = GTSTrackerMod.getInstance();
+                    if (mod == null) {
+                        return handleServiceUnavailable(context.getSource(), "gui", "GTSTrackerMod.instance");
+                    }
+                    if (mod.getDatabaseManager() == null) {
+                        return handleServiceUnavailable(context.getSource(), "gui", "DatabaseManager");
+                    }
+
                     try {
                         MinecraftClient client = MinecraftClient.getInstance();
                         client.setScreen(new BloombergGUI(getOrCreateSnapshotCache(), true));
@@ -91,5 +107,17 @@ public final class CommandHandler {
                         return 0;
                     }
                 }));
+    }
+
+    private static int handleServiceUnavailable(
+        FabricClientCommandSource source,
+        String commandName,
+        String missingDependency
+    ) {
+        LOGGER.warn("Command unavailable: command={}, missingDependency={}", commandName, missingDependency);
+        if (source.getPlayer() != null) {
+            source.getPlayer().sendMessage(Text.literal("[GTSTracker] Service unavailable; check latest.log"), false);
+        }
+        return 0;
     }
 }
